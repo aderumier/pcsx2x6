@@ -14,6 +14,7 @@
 #include "USB/usb-lightgun/guncon2.h"
 #include "VMManager.h"
 #include "DEV9/ACJV.h"
+#include "Input/EvdevGunInput.h"
 
 #include "common/Console.h"
 #include "common/StringUtil.h"
@@ -270,21 +271,24 @@ namespace usb_lightgun
 				{
 					const auto [pos_x, pos_y] = us->CalculatePosition();
 
-					// Forward mouse position to JVS: on-screen = coords, off-screen = (0,0), update sensor bit
-					// TODO: use CalculatePosition() result instead of raw mouse, so Relative Aiming (joystick) works for S246
+					// Forward this gun's position to JVS, keyed by USB port (port 0 -> P1, port 1 -> P2).
+					// Relative-aimed guns (joystick) use their own pointer; otherwise the system mouse.
+					// SetGunPosition also updates the per-gun on-screen sensor bit.
 					if (ACJV::enabled)
 					{
-						const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(0);
 						float dx, dy;
-						GSTranslateWindowToDisplayCoordinates(mx, my, &dx, &dy);
-						bool on_screen = (dx >= 0.0f && dy >= 0.0f);
-						if (on_screen)
-							ACJV::SetScreenPos(static_cast<u16>((1.0f - dx) * 0xFFFF), static_cast<u16>(dy * 0xFFFF));
+						if (us->has_relative_binds)
+						{
+							const auto& [wx, wy] = us->GetAbsolutePositionFromRelativeAxes();
+							GSTranslateWindowToDisplayCoordinates(wx, wy, &dx, &dy);
+						}
 						else
-							ACJV::SetScreenPos(0, 0);
-						const auto& gm = ACJV::GetGunMapping();
-						if (gm.sensor)
-							ACJV::SetButtonState(0, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
+						{
+							const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(EvdevGun::PointerIndexForGun(us->port));
+							GSTranslateWindowToDisplayCoordinates(mx, my, &dx, &dy);
+						}
+						const bool on_screen = (dx >= 0.0f && dy >= 0.0f);
+						ACJV::SetGunPosition(us->port, dx, dy, on_screen);
 					}
 
 					// Time Crisis games do a "calibration" by displaying a black frame for a single frame,
@@ -385,9 +389,12 @@ namespace usb_lightgun
 
 	std::tuple<s16, s16> GunCon2State::CalculatePosition()
 	{
+		// Each gun reads its resolved pointer: a dedicated evdev gun device if
+		// configured for this player, otherwise the system mouse (pointer 0).
+		const u32 pointer_index = EvdevGun::PointerIndexForGun(port);
 		float pointer_x, pointer_y;
 		const auto& [window_x, window_y] =
-			(has_relative_binds) ? GetAbsolutePositionFromRelativeAxes() : InputManager::GetPointerAbsolutePosition(0);
+			(has_relative_binds) ? GetAbsolutePositionFromRelativeAxes() : InputManager::GetPointerAbsolutePosition(pointer_index);
 		GSTranslateWindowToDisplayCoordinates(window_x, window_y, &pointer_x, &pointer_y);
 
 		s16 pos_x, pos_y;
@@ -441,6 +448,10 @@ namespace usb_lightgun
 
 	u32 GunCon2State::GetSoftwarePointerIndex() const
 	{
+		// A dedicated evdev gun feeds its own pointer index (1 = P1, 2 = P2); draw its
+		// crosshair there so each player gets a distinct cursor at the gun's position.
+		if (const u32 evdev_ptr = EvdevGun::PointerIndexForGun(port); evdev_ptr != 0)
+			return evdev_ptr;
 		return has_relative_binds ? (InputManager::MAX_POINTER_DEVICES + port) : 0;
 	}
 

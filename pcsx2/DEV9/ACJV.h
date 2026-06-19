@@ -24,7 +24,8 @@ struct InputBindingInfo;
 #define JVS_CMD_SUCCESS 0x1
 #define JVS_REVISION 0x30 //Revision 3.0
 #define JVS_VERSION 0x10 //Version 1.0
-#define JVS_PLAYER_COUNT 2 
+#define JVS_PLAYER_COUNT 2
+#define JVS_GUN_COUNT 2 // number of independent light guns (screen-position channels)
 
 
 enum BOARDID {
@@ -162,8 +163,10 @@ namespace ACJV {
     void SetMode(JVS_MODE mode);
     JVS_MODE GetMode();
     JVS_MODE ResolveModeFromGameId(const std::string& gameid); // device mode from the gameid alone; jvsmode= is an optional override
-    void SetScreenPos(u16 x, u16 y);
-    void SetGunAimSource(u32 player, bool joystick);        // lightgun aim source: false = shared mouse, true = player's stick
+    // Push a light gun's aim position into JVS state.
+    // gun: 0 = P1, 1 = P2. dx/dy are normalized display coords (0..1); on_screen=false marks off-screen.
+    void SetGunPosition(u32 gun, float dx, float dy, bool on_screen);
+    void SetGunAimSource(u32 player, bool joystick);        // lightgun aim source: false = shared mouse/gun, true = player's stick
     void SetGunRelativeAim(u32 player, float dx, float dy); // player's stick-driven screen position from the GunCon2 (display coords)
     void SetGameId(const std::string& gameid);
     const std::string& GetGameId();
