@@ -28,6 +28,12 @@ public:
 
 	static bool isMouseMappingEnabled(SettingsInterface* sif);
 
+	// Grab/release the dedicated evdev light guns for the duration of a binding
+	// capture, so a gun trigger or extra button is captured as Pointer-1/Pointer-2
+	// rather than driving the system cursor (Pointer-0). Shared with InputBindingDialog.
+	static void beginGunBindingCapture();
+	static void endGunBindingCapture();
+
 	void initialize(SettingsInterface* sif, InputBindingInfo::Type bind_type, std::string section_name, std::string key_name);
 
 public Q_SLOTS:

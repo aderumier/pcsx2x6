@@ -85,6 +85,7 @@
 #include "DEV9/ACATA.h"
 #include "DEV9/ACATAPI.h"
 #include "DEV9/ACJV.h"
+#include "Input/EvdevGunInput.h"
 #include "DEV9/ACSRAM.h"
 
 namespace VMManager
@@ -1883,6 +1884,7 @@ void VMManager::Shutdown(bool save_resume_state)
 	g_Sio2.Shutdown();
 	g_Sio0.Shutdown();
 	MemcardBusy::ClearBusy();
+	EvdevGun::StopAll();
 	DEV9close();
 	DoCDVDclose();
 	FWclose();

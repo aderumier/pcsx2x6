@@ -867,11 +867,13 @@ set(pcsx2InputSources
 	Input/InputManager.cpp
 	Input/InputSource.cpp
 	Input/SDLInputSource.cpp
+	Input/EvdevGunInput.cpp
 )
 set(pcsx2InputHeaders
 	Input/InputManager.h
 	Input/InputSource.h
 	Input/SDLInputSource.h
+	Input/EvdevGunInput.h
 )
 
 if(APPLE)
