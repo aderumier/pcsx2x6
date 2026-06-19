@@ -5,6 +5,7 @@
 #include "Config.h"
 #include "Host.h"
 #include "Input/InputManager.h"
+#include "Input/EvdevGunInput.h"
 #include "GS/GS.h"
 #include "common/SettingsInterface.h"
 #include <algorithm>
@@ -297,6 +298,9 @@ static std::atomic<bool> s_sinden_border_enabled{false};
 static std::atomic<int> s_sinden_border_mode{0};
 static std::atomic<int> s_sinden_border_thickness{10};
 static std::string s_gameid;
+// Per-player light gun device index (Batocera "numdevice"): -1 = autodetect by order,
+// >= 0 = explicit index into the sorted ID_INPUT_GUN list. Read from [USB1]/[USB2].
+static std::array<int, EvdevGun::NUM_GUNS> s_gun_numdevice = {-1, -1};
 
 std::span<const ACJV::DIPSwitchInfo> ACJV::GetDIPSwitches()
 {
@@ -414,6 +418,10 @@ void ACJV::LoadConfig(const SettingsInterface& si)
 	s_sinden_border_enabled = si.GetBoolValue(CONFIG_SECTION, "SindenBorderEnabled", false);
 	s_sinden_border_mode = si.GetIntValue(CONFIG_SECTION, "SindenBorderMode", 0);
 	s_sinden_border_thickness = si.GetIntValue(CONFIG_SECTION, "SindenBorderThickness", 10);
+	// Light gun device index per player, stored Batocera-style under the USB port
+	// section (e.g. [USB1] guncon2_numdevice). -1 = autodetect by order.
+	s_gun_numdevice[0] = si.GetIntValue("USB1", "guncon2_numdevice", -1);
+	s_gun_numdevice[1] = si.GetIntValue("USB2", "guncon2_numdevice", -1);
 }
 
 void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface& src_si, bool copy_settings, bool copy_bindings)
@@ -483,10 +491,10 @@ static u16 m_jvsButtonState[JVS_PLAYER_COUNT] = {};
 static u8 m_testButtonState = 0;
 static u16 m_coin1 = 0;
 static u16 m_coin2 = 0;
-static u16 m_jvsScreenPosX = 0;
-static u16 m_jvsScreenPosY = 0;
-static float m_jvsLightgunDX = -1.0f;  // normalized display X (-1 = off-screen)
-static float m_jvsLightgunDY = -1.0f;  // normalized display Y (-1 = off-screen)
+static u16 m_jvsScreenPosX[JVS_GUN_COUNT] = {};
+static u16 m_jvsScreenPosY[JVS_GUN_COUNT] = {};
+static float m_jvsLightgunDX[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normalized display X (-1 = off-screen)
+static float m_jvsLightgunDY[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normalized display Y (-1 = off-screen)
 static u16 m_jvsWheelChannels[JVS_WHEEL_CHANNEL_MAX] = {};
 static u16 m_jvsDrumChannels[JVS_DRUM_CHANNEL_MAX] = {};
 
@@ -570,6 +578,13 @@ void ACJV::InsertCoin(u32 slot)
 void ACJV::SetMode(JVS_MODE mode)
 {
 	m_jvsMode = mode;
+
+	// Grab the dedicated gun devices only while a light gun game is running.
+	// Devices auto-detect by order; per-player numdevice indices override (Batocera).
+	if (mode == JVS_MODE::LIGHTGUN)
+		EvdevGun::StartGuns(s_gun_numdevice);
+	else
+		EvdevGun::StopAll();
 }
 
 void ACJV::SetWheelAxis(u32 axis, float value)
@@ -613,10 +628,30 @@ int ACJV::GetSindenBorderThickness()
 	return s_sinden_border_thickness;
 }
 
-void ACJV::SetScreenPos(u16 x, u16 y)
+void ACJV::SetGunPosition(u32 gun, float dx, float dy, bool on_screen)
 {
-	m_jvsScreenPosX = x;
-	m_jvsScreenPosY = y;
+	if (gun >= JVS_GUN_COUNT)
+		return;
+
+	if (on_screen)
+	{
+		m_jvsLightgunDX[gun] = dx;
+		m_jvsLightgunDY[gun] = dy;
+		m_jvsScreenPosX[gun] = static_cast<u16>((1.0f - dx) * 0xFFFF);
+		m_jvsScreenPosY[gun] = static_cast<u16>(dy * 0xFFFF);
+	}
+	else
+	{
+		m_jvsLightgunDX[gun] = -1.0f;
+		m_jvsLightgunDY[gun] = -1.0f;
+		m_jvsScreenPosX[gun] = 0;
+		m_jvsScreenPosY[gun] = 0;
+	}
+
+	// Map the gun's on-screen sensor to its player switch input (P1 -> player 0, P2 -> player 1).
+	const auto& gm = ACJV::GetGunMapping();
+	if (gm.sensor)
+		ACJV::SetButtonState(gun, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
 }
 
 // Called from VMManager on game boot. Resets all JVS state and selects per-game I/O config.
@@ -633,10 +668,13 @@ void ACJV::SetGameId(const std::string& gameid)
 	m_jvsButtonState[1] = 0;
 	m_jvsSystemButtonState = 0;
 	m_testButtonState = 0;
-	m_jvsScreenPosX = 0;
-	m_jvsScreenPosY = 0;
-	m_jvsLightgunDX = -1.0f;
-	m_jvsLightgunDY = -1.0f;
+	for (int i = 0; i < JVS_GUN_COUNT; i++)
+	{
+		m_jvsScreenPosX[i] = 0;
+		m_jvsScreenPosY[i] = 0;
+		m_jvsLightgunDX[i] = -1.0f;
+		m_jvsLightgunDY[i] = -1.0f;
+	}
 	std::memset(m_jvsWheelChannels, 0, sizeof(m_jvsWheelChannels));
 	std::memset(m_jvsDrumChannels, 0, sizeof(m_jvsDrumChannels));
 
@@ -693,30 +731,26 @@ const GunMapping& ACJV::GetGunMapping()
 	return *m_gunMapping;
 }
 
+// Refresh each gun's screen position from its resolved pointer every JVS poll.
+// Gun 0 always tracks its pointer (a dedicated evdev gun if configured, else the
+// system mouse). Additional guns are only driven here when they have their own
+// dedicated evdev gun; a gun with no evdev device (e.g. relative/joystick aiming)
+// is left to be pushed by its GunCon2 USB device via ACJV::SetGunPosition.
 static void UpdateLightgunFromMouse()
 {
-	const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(0);
-	float dx, dy;
-	GSTranslateWindowToDisplayCoordinates(mx, my, &dx, &dy);
-	constexpr float edge_margin = 0.01f;
-	bool on_screen = (dx >= 0.0f && dy >= 0.0f && dx < (1.0f - edge_margin) && dy < (1.0f - edge_margin));
-	if (on_screen)
+	for (u32 gun = 0; gun < JVS_GUN_COUNT; gun++)
 	{
-		m_jvsLightgunDX = dx;
-		m_jvsLightgunDY = dy;
-		m_jvsScreenPosX = static_cast<u16>((1.0f - dx) * 0xFFFF);
-		m_jvsScreenPosY = static_cast<u16>(dy * 0xFFFF);
+		const u32 pointer_index = EvdevGun::PointerIndexForGun(gun);
+		if (gun != 0 && pointer_index == 0)
+			continue;
+
+		const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(pointer_index);
+		float dx, dy;
+		GSTranslateWindowToDisplayCoordinates(mx, my, &dx, &dy);
+		constexpr float edge_margin = 0.01f;
+		const bool on_screen = (dx >= 0.0f && dy >= 0.0f && dx < (1.0f - edge_margin) && dy < (1.0f - edge_margin));
+		ACJV::SetGunPosition(gun, dx, dy, on_screen);
 	}
-	else
-	{
-		m_jvsLightgunDX = -1.0f;
-		m_jvsLightgunDY = -1.0f;
-		m_jvsScreenPosX = 0;
-		m_jvsScreenPosY = 0;
-	}
-	const auto& gm = ACJV::GetGunMapping();
-	if (gm.sensor)
-		ACJV::SetButtonState(0, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
 }
 
 // Combine host axes into the 3 JVS analog channels (steer/gas/brake). Steering encoding is per-game.
@@ -1002,10 +1036,10 @@ void do_jvs_packet(const u8* input, u8* output) {
 			{
 				JVS_ASSERT(channel == 2);
 				UpdateLightgunFromMouse();
-				(*output++) = static_cast<u8>(m_jvsScreenPosX >> 8); //Pos X MSB
-				(*output++) = static_cast<u8>(m_jvsScreenPosX);      //Pos X LSB
-				(*output++) = static_cast<u8>(m_jvsScreenPosY >> 8); //Pos Y MSB
-				(*output++) = static_cast<u8>(m_jvsScreenPosY);      //Pos Y LSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosX[0] >> 8); //Pos X MSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosX[0]);      //Pos X LSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosY[0] >> 8); //Pos Y MSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosY[0]);      //Pos Y LSB
 			}
 			else if(m_jvsMode == JVS_MODE::DRUM)
 			{
@@ -1048,21 +1082,32 @@ void do_jvs_packet(const u8* input, u8* output) {
 			// - MIU-I/O (TC3): native 640x224, Y inverted (bottom-up)
 			// - RAYS PCB (TC4, Cobra, VPN): full 16-bit range 0xFFFF, Y inverted (bottom-up)
 			// pos=0 means off-screen in JVS, so on-screen values are clamped to minimum 1
-			u16 posX = 0, posY = 0;
-			if(m_jvsMode == JVS_MODE::LIGHTGUN && m_jvsLightgunDX >= 0.0f)
-			{
-				const float scaleX = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 640.0f : 0xFFFF;
-				const float scaleY = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 224.0f : 0xFFFF;
-				posX = static_cast<u16>(m_jvsLightgunDX * scaleX);
-				if (ACJV::CurrentBoardID == RAYS_PCB || ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI)
-					posY = static_cast<u16>((1.0f - m_jvsLightgunDY) * scaleY);
-				else
-					posY = static_cast<u16>(m_jvsLightgunDY * scaleY);
-				if (posX == 0) posX = 1;
-				if (posY == 0) posY = 1;
-			}
+			//
+			// Vampire Night reads channel 1 (P1) and channel 2 (P2) every frame as two
+			// separate requests. Its JVS parser consumes `channel` position pairs (so we
+			// must emit that many), but reads the FIRST pair as the requested channel's
+			// gun. So emit the requested gun first, descending: channel 1 -> [gun0],
+			// channel 2 -> [gun1, gun0]. (Verified via log: returning only one pair for
+			// channel 2 desynced the packet and broke P1 too.)
+			const float scaleX = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 640.0f : 0xFFFF;
+			const float scaleY = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 224.0f : 0xFFFF;
 			for (u8 ch = 0; ch < channel; ch++)
 			{
+				const int gun_signed = static_cast<int>(channel) - 1 - static_cast<int>(ch);
+				const u32 gun = (gun_signed <= 0) ? 0u
+								: (static_cast<u32>(gun_signed) < JVS_GUN_COUNT) ? static_cast<u32>(gun_signed)
+								: (JVS_GUN_COUNT - 1);
+				u16 posX = 0, posY = 0;
+				if(m_jvsMode == JVS_MODE::LIGHTGUN && m_jvsLightgunDX[gun] >= 0.0f)
+				{
+					posX = static_cast<u16>(m_jvsLightgunDX[gun] * scaleX);
+					if (ACJV::CurrentBoardID == RAYS_PCB || ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI)
+						posY = static_cast<u16>((1.0f - m_jvsLightgunDY[gun]) * scaleY);
+					else
+						posY = static_cast<u16>(m_jvsLightgunDY[gun] * scaleY);
+					if (posX == 0) posX = 1;
+					if (posY == 0) posY = 1;
+				}
 				(*output++) = static_cast<u8>(posX >> 8);
 				(*output++) = static_cast<u8>(posX);
 				(*output++) = static_cast<u8>(posY >> 8);
