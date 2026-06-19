@@ -12,6 +12,9 @@
 #include <sstream>
 
 #include "pcsx2/Host.h"
+#include "pcsx2/Input/EvdevGunInput.h"
+
+#include <array>
 
 #include "QtHost.h"
 #include "QtUtils.h"
@@ -319,10 +322,12 @@ void InputBindingWidget::startListeningForInput(u32 timeout_in_seconds)
 	grabMouse();
 	setMouseTracking(true);
 	hookInputManager();
+	beginGunBindingCapture();
 }
 
 void InputBindingWidget::stopListeningForInput()
 {
+	endGunBindingCapture();
 	reloadBinding();
 	delete m_input_listen_timer;
 	m_input_listen_timer = nullptr;
@@ -333,6 +338,33 @@ void InputBindingWidget::stopListeningForInput()
 	releaseMouse();
 	releaseKeyboard();
 	removeEventFilter(this);
+}
+
+// Remembers, per gun slot, whether it was already running before a capture began,
+// so endGunBindingCapture only stops the slots that *we* started here and never
+// disturbs guns a running light-gun game owns.
+static std::array<bool, EvdevGun::NUM_GUNS> s_gun_running_before_capture{};
+
+void InputBindingWidget::beginGunBindingCapture()
+{
+	for (u32 gun = 0; gun < EvdevGun::NUM_GUNS; gun++)
+		s_gun_running_before_capture[gun] = EvdevGun::IsRunning(gun);
+
+	const std::array<int, EvdevGun::NUM_GUNS> numdevice = {
+		Host::GetBaseIntSettingValue("USB1", "guncon2_numdevice", -1),
+		Host::GetBaseIntSettingValue("USB2", "guncon2_numdevice", -1)};
+	EvdevGun::StartGuns(numdevice);
+}
+
+void InputBindingWidget::endGunBindingCapture()
+{
+	// Only release slots that weren't already running before we grabbed them; this
+	// leaves a running game's guns untouched without depending on ACJV mode state.
+	for (u32 gun = 0; gun < EvdevGun::NUM_GUNS; gun++)
+	{
+		if (!s_gun_running_before_capture[gun])
+			EvdevGun::Stop(gun);
+	}
 }
 
 void InputBindingWidget::inputManagerHookCallback(InputBindingKey key, float value)

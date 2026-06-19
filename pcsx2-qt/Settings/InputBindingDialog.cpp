@@ -185,10 +185,12 @@ void InputBindingDialog::startListeningForInput(u32 timeout_in_seconds)
 	grabMouse();
 	setMouseTracking(true);
 	hookInputManager();
+	InputBindingWidget::beginGunBindingCapture();
 }
 
 void InputBindingDialog::stopListeningForInput()
 {
+	InputBindingWidget::endGunBindingCapture();
 	m_ui.status->clear();
 	m_ui.addBinding->setEnabled(true);
 	m_ui.removeBinding->setEnabled(true);

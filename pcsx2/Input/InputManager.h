@@ -166,8 +166,12 @@ namespace InputManager
 	static constexpr double VIBRATION_UPDATE_INTERVAL_SECONDS = 0.5; // 500ms
 
 	/// Maximum number of host mouse devices.
-	static constexpr u32 MAX_POINTER_DEVICES = 1;
-	static constexpr u32 MAX_POINTER_BUTTONS = 3;
+	/// Index 0 is the system mouse (fed by the host window). Indices 1 and 2 are
+	/// optional dedicated light gun devices (P1, P2) read via evdev on Linux.
+	static constexpr u32 MAX_POINTER_DEVICES = 3;
+	// 0-2 are the standard mouse buttons (left/right/middle); 3-10 carry a light
+	// gun's extra buttons (evdev BTN_1..BTN_8) so they can be bound in the GUI.
+	static constexpr u32 MAX_POINTER_BUTTONS = 11;
 
 	/// Maximum number of software cursors. We allocate an extra two for USB devices with
 	/// positioning data from the controller instead of a mouse.
