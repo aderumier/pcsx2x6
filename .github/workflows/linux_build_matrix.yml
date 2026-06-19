@@ -26,7 +26,8 @@ jobs:
     secrets: inherit
   build_linux_debug:
     name: "Debug"
-    if: github.repository != 'PCSX2/pcsx2' || github.event_name == 'pull_request'
+    # Temporarily disabled on the feature/two-lightguns branch to build only the AppImage.
+    if: false
     uses: ./.github/workflows/linux_build_qt.yml
     with:
       jobName: "Debug Build"
@@ -38,7 +39,8 @@ jobs:
     secrets: inherit
   build_linux_flatpak:
     name: "Flatpak"
-    if: github.repository != 'PCSX2/pcsx2' || github.event_name == 'pull_request'
+    # Temporarily disabled on the feature/two-lightguns branch to build only the AppImage.
+    if: false
     uses: ./.github/workflows/linux_build_flatpak.yml
     with:
       jobName: "Flatpak Build"
