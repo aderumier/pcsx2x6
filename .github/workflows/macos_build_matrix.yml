@@ -4,6 +4,7 @@ on:
   push:
     branches-ignore:
       - "l10n_master"
+      - "RGS2"
   pull_request:
     branches:
       - master
