@@ -5,6 +5,7 @@ on:
     branches-ignore:
       - "l10n_master"
       - "feature/two-lightguns"
+      - "wheel"
   pull_request:
     branches:
       - master

@@ -26,7 +26,7 @@ jobs:
     secrets: inherit
   build_linux_debug:
     name: "Debug"
-    # Temporarily disabled on the feature/two-lightguns branch to build only the AppImage.
+    # Temporarily disabled on the wheel branch to build only the AppImage.
     if: false
     uses: ./.github/workflows/linux_build_qt.yml
     with:
@@ -39,7 +39,7 @@ jobs:
     secrets: inherit
   build_linux_flatpak:
     name: "Flatpak"
-    # Temporarily disabled on the feature/two-lightguns branch to build only the AppImage.
+    # Temporarily disabled on the wheel branch to build only the AppImage.
     if: false
     uses: ./.github/workflows/linux_build_flatpak.yml
     with:
