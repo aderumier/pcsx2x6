@@ -123,23 +123,48 @@ static constexpr GenericInputBinding s_fighting_face_buttons[][6] = {
 
 static std::array<InputBindingInfo, 12> s_active_p1_bindings;
 static std::array<InputBindingInfo, 12> s_active_p2_bindings;
+// True once a per-game fighting/driving layout has populated s_active_p1/p2_bindings.
+// GetButtonBindings returns the active tables only when this is set.
+static bool s_active_bindings_valid = false;
 
 // Copy the base P1/P2 tables, then set the default pad button of BTN1-6 from
-// the game's layout row. Binding table indices:
+// the given face-button row. Binding table indices:
 //   [0]=Up    [1]=Down  [2]=Left   [3]=Right
 //   [4]=BTN1  [5]=BTN2  [6]=BTN3   [7]=BTN4
 //   [8]=BTN5  [9]=BTN6  [10]=Start [11]=Service
-static void UpdateFightingBindings(FightingLayout layout)
+static void ApplyFaceButtonLayout(const GenericInputBinding (&face)[6])
 {
 	s_active_p1_bindings = s_jvs_p1_button_bindings;
 	s_active_p2_bindings = s_jvs_p2_button_bindings;
-	const auto& face = s_fighting_face_buttons[static_cast<int>(layout)];
 	constexpr int BTN1_INDEX = 4;
 	for (int i = 0; i < 6; i++)
 	{
 		s_active_p1_bindings[BTN1_INDEX + i].generic_mapping = face[i];
 		s_active_p2_bindings[BTN1_INDEX + i].generic_mapping = face[i];
 	}
+	s_active_bindings_valid = true;
+}
+
+static void UpdateFightingBindings(FightingLayout layout)
+{
+	ApplyFaceButtonLayout(s_fighting_face_buttons[static_cast<int>(layout)]);
+}
+
+// Per-game driving button layouts (BTN1-6 -> pad button), same idea as fighting.
+// Driving cabinets wire view-change / gear shift to specific JVS push switches that
+// differ from the default PS2 face-button order, so we remap per game.
+enum class DrivingLayout {
+	ACE_DRIVER, // Ace Driver 3: Final Turn (NM00047)
+};
+
+static constexpr GenericInputBinding s_driving_face_buttons[][6] = {
+	// BTN1(Push1),               BTN2(Push2),                  BTN3(Push3),             BTN4(Push4),                BTN5(Push5),                BTN6(Push6)
+	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::L1, GenericInputBinding::Cross, GenericInputBinding::Circle, GenericInputBinding::R1}, // ACE_DRIVER (all 6 reachable)
+};
+
+static void UpdateDrivingBindings(DrivingLayout layout)
+{
+	ApplyFaceButtonLayout(s_driving_face_buttons[static_cast<int>(layout)]);
 }
 
 static constexpr const std::array<InputBindingInfo, 2> s_jvs_coin_bindings = {{
@@ -222,14 +247,14 @@ static JVS_MODE m_jvsMode = JVS_MODE::DEFAULT;
 
 std::span<const InputBindingInfo> ACJV::GetButtonBindings()
 {
-	if (m_jvsMode == JVS_MODE::FIGHTING)
+	if (s_active_bindings_valid && (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE))
 		return s_active_p1_bindings;
 	return s_jvs_p1_button_bindings;
 }
 
 std::span<const InputBindingInfo> ACJV::GetP2ButtonBindings()
 {
-	if (m_jvsMode == JVS_MODE::FIGHTING)
+	if (s_active_bindings_valid && (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE))
 		return s_active_p2_bindings;
 	return s_jvs_p2_button_bindings;
 }
@@ -518,6 +543,11 @@ static const std::map<std::string, const char*> s_driving_game_ids = {
 	{"NM00047", "Ace Driver 3 - Final Turn"},
 };
 
+// Per-game driving button layouts (see DrivingLayout / s_driving_face_buttons).
+static const std::map<std::string, DrivingLayout> s_driving_layouts = {
+	{"NM00047", DrivingLayout::ACE_DRIVER}, // Ace Driver 3: Final Turn
+};
+
 const std::string& ACJV::GetGameId() { return s_gameid; }
 
 void ACJV::SetGameId(const std::string& gameid)
@@ -542,6 +572,7 @@ void ACJV::SetGameId(const std::string& gameid)
 	m_jvsWheelLeft = 0.0f;
 	m_jvsWheelRight = 0.0f;
 	std::memset(m_jvsDrumChannels, 0, sizeof(m_jvsDrumChannels));
+	s_active_bindings_valid = false; // reset per-game button layout; re-applied below if any
 
 	// Select per-game gun mapping, or fall back to default
 	auto it = s_gun_mappings.find(gameid);
@@ -572,6 +603,14 @@ void ACJV::SetGameId(const std::string& gameid)
 			Console.WriteLn("ACJV: auto-detected driving mode for %s (%s)", gameid.c_str(), dit->second);
 			SetMode(JVS_MODE::DRIVE);
 		}
+	}
+
+	// Apply per-game driving button layout (view change / gear shift wiring).
+	auto dl = s_driving_layouts.find(gameid);
+	if (dl != s_driving_layouts.end())
+	{
+		Console.WriteLn("ACJV: driving button layout applied for %s", gameid.c_str());
+		UpdateDrivingBindings(dl->second);
 	}
 
 	// TC3 has 3 I/O boards: TSS-I/O (white flash), MIU-I/O (640x224), RAYS PCB (0xFFFF).
