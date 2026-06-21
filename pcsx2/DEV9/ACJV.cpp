@@ -514,6 +514,7 @@ static const std::map<std::string, const char*> s_driving_game_ids = {
 	{"NM00008", "Wangan Midnight"},
 	{"NM00010", "Battle Gear 3"},
 	{"NM00015", "Battle Gear 3 Tuned"},
+	{"NM00039", "MotoGP"},
 	{"NM00047", "Ace Driver 3 - Final Turn"},
 };
 
@@ -885,10 +886,26 @@ void do_jvs_packet(const u8* input, u8* output) {
 			}
 			else if(m_jvsMode == JVS_MODE::DRIVE)
 			{
-				for(int i = 0; i < JVS_WHEEL_CHANNEL_MAX; i++)
+				// Emit exactly the number of channels the game asked for so the
+				// data length always matches the (2*channel)+1 declared below.
+				// Channels we don't drive (beyond steering/gas/brake) report 0.
+				for(int i = 0; i < channel; i++)
 				{
-					(*output++) = static_cast<u8>(m_jvsWheelChannels[i] >> 8);
-					(*output++) = static_cast<u8>(m_jvsWheelChannels[i]);
+					const u16 v = (i < JVS_WHEEL_CHANNEL_MAX) ? m_jvsWheelChannels[i] : 0;
+					(*output++) = static_cast<u8>(v >> 8);
+					(*output++) = static_cast<u8>(v);
+				}
+			}
+			else
+			{
+				// Any other mode that still receives an analog read: emit the
+				// requested number of zero channels so the packet length stays
+				// consistent with the (2*channel)+1 declared below (otherwise the
+				// whole JVS response is under-filled and every later read corrupts).
+				for(int i = 0; i < channel; i++)
+				{
+					(*output++) = 0;
+					(*output++) = 0;
 				}
 			}
 
