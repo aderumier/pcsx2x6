@@ -685,6 +685,16 @@ void do_jvs_packet(const u8* input, u8* output) {
 		u8 cmd = (*input++);
 		inSize--;
 		inWorkChecksum += cmd;
+		// TEMP diag: log the first time each distinct JVS command byte is seen,
+		// so we learn the game's full command vocabulary without flooding the log.
+		{
+			static bool s_diag_cmd_seen[256] = {};
+			if (!s_diag_cmd_seen[cmd])
+			{
+				s_diag_cmd_seen[cmd] = true;
+				Console.WriteLn("ACJV-DIAG: first time seeing JVS CMD 0x%02X", cmd);
+			}
+		}
 		switch(cmd) {
 		case JVS::RESET: {
 			JVS_ASSERT(inSize != 0);
