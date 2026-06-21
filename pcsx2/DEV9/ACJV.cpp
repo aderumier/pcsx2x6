@@ -685,7 +685,7 @@ void do_jvs_packet(const u8* input, u8* output) {
 	// TEMP diag: dump the raw command stream of the first packets that contain a
 	// 0x70 command, so we can see command order and 0x70's payload/length.
 	{
-		static int s_diag_dumps_left = 12;
+		static int s_diag_dumps_left = 80;
 		bool has70 = false;
 		for (u8 n = 0; n < inSize; n++)
 			if (input[n] == 0x70) { has70 = true; break; }
@@ -892,6 +892,17 @@ void do_jvs_packet(const u8* input, u8* output) {
 			(*output++) = static_cast<u8>(m_coin1 & 0x00ff);                                //Coin 1 LSB
 
 			(*dstSize) += 3;
+
+			// TEMP diag: once a coin has been inserted, log a capped number of coin
+			// reads so we can see what the game does during the runaway.
+			{
+				static int s_diag_coinread_left = 80;
+				if (m_coin1 > 0 && s_diag_coinread_left > 0)
+				{
+					s_diag_coinread_left--;
+					Console.WriteLn("ACJV-DIAG: READ_INP_COIN(0x21) slotCount=%u -> coin1=%u coin2=%u", slotCount, m_coin1, m_coin2);
+				}
+			}
 
 			if(slotCount == 2)
 			{
