@@ -193,6 +193,11 @@ enum JVSButton : u16 {
     JVS_BTN_4       = 0x4000,
     JVS_BTN_5       = 0x2000,
     JVS_BTN_6       = 0x1000,
+    // High-byte extension switches (JVS "EXT" lines). Some cabinets wire extra
+    // buttons here, e.g. Ace Driver 3 View Change = EXT2 (0x0200).
+    JVS_BTN_7       = 0x0800, // EXT4
+    JVS_BTN_8       = 0x0400, // EXT3
+    JVS_BTN_9       = 0x0200, // EXT2
 };
 
 

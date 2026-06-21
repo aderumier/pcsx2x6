@@ -80,7 +80,7 @@ static constexpr const std::array<InputBindingInfo, ACJV::NUM_DIP_SWITCHES> s_di
 	{s_dip_switch_info[3].toggle_bind_name, TRANSLATE_NOOP("JVS", "Toggle Video Sync Split"), nullptr, InputBindingInfo::Type::Button, 3, GenericInputBinding::Unknown},
 }};
 
-static constexpr const std::array<InputBindingInfo, 12> s_jvs_p1_button_bindings = {{
+static constexpr const std::array<InputBindingInfo, 15> s_jvs_p1_button_bindings = {{
 	{"P1_Up",      TRANSLATE_NOOP("JVS", "P1 Up"),       nullptr, InputBindingInfo::Type::Button, JVS_BTN_UP,      GenericInputBinding::DPadUp},
 	{"P1_Down",    TRANSLATE_NOOP("JVS", "P1 Down"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_DOWN,    GenericInputBinding::DPadDown},
 	{"P1_Left",    TRANSLATE_NOOP("JVS", "P1 Left"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_LEFT,    GenericInputBinding::DPadLeft},
@@ -91,11 +91,14 @@ static constexpr const std::array<InputBindingInfo, 12> s_jvs_p1_button_bindings
 	{"P1_Button4", TRANSLATE_NOOP("JVS", "P1 Button 4"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_4,       GenericInputBinding::Cross},
 	{"P1_Button5", TRANSLATE_NOOP("JVS", "P1 Button 5"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_5,       GenericInputBinding::Circle},
 	{"P1_Button6", TRANSLATE_NOOP("JVS", "P1 Button 6"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_6,       GenericInputBinding::Unknown},
+	{"P1_Button7", TRANSLATE_NOOP("JVS", "P1 Button 7"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_7,       GenericInputBinding::Unknown},
+	{"P1_Button8", TRANSLATE_NOOP("JVS", "P1 Button 8"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_8,       GenericInputBinding::Unknown},
+	{"P1_Button9", TRANSLATE_NOOP("JVS", "P1 Button 9"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_9,       GenericInputBinding::Unknown},
 	{"P1_Start",   TRANSLATE_NOOP("JVS", "P1 Start"),    nullptr, InputBindingInfo::Type::Button, JVS_BTN_START,   GenericInputBinding::Start},
 	{"P1_Service", TRANSLATE_NOOP("JVS", "P1 Service"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE, GenericInputBinding::Select},
 }};
 
-static constexpr const std::array<InputBindingInfo, 12> s_jvs_p2_button_bindings = {{
+static constexpr const std::array<InputBindingInfo, 15> s_jvs_p2_button_bindings = {{
 	{"P2_Up",      TRANSLATE_NOOP("JVS", "P2 Up"),       nullptr, InputBindingInfo::Type::Button, JVS_BTN_UP,      GenericInputBinding::DPadUp},
 	{"P2_Down",    TRANSLATE_NOOP("JVS", "P2 Down"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_DOWN,    GenericInputBinding::DPadDown},
 	{"P2_Left",    TRANSLATE_NOOP("JVS", "P2 Left"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_LEFT,    GenericInputBinding::DPadLeft},
@@ -106,6 +109,9 @@ static constexpr const std::array<InputBindingInfo, 12> s_jvs_p2_button_bindings
 	{"P2_Button4", TRANSLATE_NOOP("JVS", "P2 Button 4"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_4,       GenericInputBinding::Cross},
 	{"P2_Button5", TRANSLATE_NOOP("JVS", "P2 Button 5"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_5,       GenericInputBinding::Circle},
 	{"P2_Button6", TRANSLATE_NOOP("JVS", "P2 Button 6"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_6,       GenericInputBinding::Unknown},
+	{"P2_Button7", TRANSLATE_NOOP("JVS", "P2 Button 7"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_7,       GenericInputBinding::Unknown},
+	{"P2_Button8", TRANSLATE_NOOP("JVS", "P2 Button 8"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_8,       GenericInputBinding::Unknown},
+	{"P2_Button9", TRANSLATE_NOOP("JVS", "P2 Button 9"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_9,       GenericInputBinding::Unknown},
 	{"P2_Start",   TRANSLATE_NOOP("JVS", "P2 Start"),    nullptr, InputBindingInfo::Type::Button, JVS_BTN_START,   GenericInputBinding::Start},
 	{"P2_Service", TRANSLATE_NOOP("JVS", "P2 Service"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE, GenericInputBinding::Select},
 }};
@@ -121,8 +127,8 @@ static constexpr GenericInputBinding s_fighting_face_buttons[][6] = {
 	{GenericInputBinding::Square, GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::Triangle, GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // BLOODYROAR
 };
 
-static std::array<InputBindingInfo, 12> s_active_p1_bindings;
-static std::array<InputBindingInfo, 12> s_active_p2_bindings;
+static std::array<InputBindingInfo, 15> s_active_p1_bindings;
+static std::array<InputBindingInfo, 15> s_active_p2_bindings;
 // True once a per-game fighting/driving layout has populated s_active_p1/p2_bindings.
 // GetButtonBindings returns the active tables only when this is set.
 static bool s_active_bindings_valid = false;
@@ -150,21 +156,33 @@ static void UpdateFightingBindings(FightingLayout layout)
 	ApplyFaceButtonLayout(s_fighting_face_buttons[static_cast<int>(layout)]);
 }
 
-// Per-game driving button layouts (BTN1-6 -> pad button), same idea as fighting.
-// Driving cabinets wire view-change / gear shift to specific JVS push switches that
-// differ from the default PS2 face-button order, so we remap per game.
+// Per-game driving button layouts. Driving cabinets wire view-change / gear shift
+// to specific JVS push switches (including high-byte extension lines) that differ
+// from the default PS2 face-button order, so we remap the full Button1-9 range.
+// Mappings taken from TeknoParrot game profiles.
 enum class DrivingLayout {
 	ACE_DRIVER, // Ace Driver 3: Final Turn (NM00047)
 };
 
-static constexpr GenericInputBinding s_driving_face_buttons[][6] = {
-	// BTN1(Push1),               BTN2(Push2),                  BTN3(Push3),             BTN4(Push4),                BTN5(Push5),                BTN6(Push6)
-	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::L1, GenericInputBinding::Cross, GenericInputBinding::Circle, GenericInputBinding::R1}, // ACE_DRIVER (all 6 reachable)
+// Pad button assigned to each JVS push switch, Button1..Button9 (indices 4..12 in
+// the binding tables). Button9 = EXT2 (0x0200) is the extension line used for views.
+static constexpr GenericInputBinding s_driving_buttons[][9] = {
+	// Btn1(Enter)              Btn2                          Btn3(GearUp)          Btn4(GearDown)        Btn5                          Btn6                          Btn7                          Btn8                          Btn9(ViewChange)
+	{GenericInputBinding::Cross, GenericInputBinding::Unknown, GenericInputBinding::R1, GenericInputBinding::L1, GenericInputBinding::Unknown, GenericInputBinding::Unknown, GenericInputBinding::Unknown, GenericInputBinding::Unknown, GenericInputBinding::Triangle}, // ACE_DRIVER
 };
 
 static void UpdateDrivingBindings(DrivingLayout layout)
 {
-	ApplyFaceButtonLayout(s_driving_face_buttons[static_cast<int>(layout)]);
+	s_active_p1_bindings = s_jvs_p1_button_bindings;
+	s_active_p2_bindings = s_jvs_p2_button_bindings;
+	const auto& btn = s_driving_buttons[static_cast<int>(layout)];
+	constexpr int BTN1_INDEX = 4; // [4..12] = Button1..Button9
+	for (int i = 0; i < 9; i++)
+	{
+		s_active_p1_bindings[BTN1_INDEX + i].generic_mapping = btn[i];
+		s_active_p2_bindings[BTN1_INDEX + i].generic_mapping = btn[i];
+	}
+	s_active_bindings_valid = true;
 }
 
 static constexpr const std::array<InputBindingInfo, 2> s_jvs_coin_bindings = {{
@@ -543,7 +561,7 @@ static const std::map<std::string, const char*> s_driving_game_ids = {
 	{"NM00047", "Ace Driver 3 - Final Turn"},
 };
 
-// Per-game driving button layouts (see DrivingLayout / s_driving_face_buttons).
+// Per-game driving button layouts (see DrivingLayout / s_driving_buttons).
 static const std::map<std::string, DrivingLayout> s_driving_layouts = {
 	{"NM00047", DrivingLayout::ACE_DRIVER}, // Ace Driver 3: Final Turn
 };
