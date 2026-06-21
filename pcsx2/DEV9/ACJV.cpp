@@ -463,6 +463,7 @@ void ACJV::InsertCoin(u32 slot)
 		m_coin1++;
 	else if (slot == 1)
 		m_coin2++;
+	Console.WriteLn("ACJV-DIAG: InsertCoin slot=%u -> coin1=%u coin2=%u", slot, m_coin1, m_coin2); // TEMP diag
 }
 
 void ACJV::SetMode(JVS_MODE mode)
@@ -888,6 +889,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 			if(slotCount == 1) m_coin1 += (amountMSB << 8) + amountLSB;
 			if(slotCount == 2) m_coin2 += (amountMSB << 8) + amountLSB;
 
+			Console.WriteLn("ACJV-DIAG: OUTPUT_COIN_NUM(0x35) slot=%u amount=%u -> coin1=%u", slotCount, (amountMSB << 8) + amountLSB, m_coin1); // TEMP diag
+
 			(*output++) = JVS_CMD_SUCCESS;
 
 			(*dstSize) += 1;
@@ -907,6 +910,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 			if(slotCount == 1) m_coin1 -= (amountMSB << 8) + amountLSB;
 			if(slotCount == 2) m_coin2 -= (amountMSB << 8) + amountLSB;
+
+			Console.WriteLn("ACJV-DIAG: DECREASE_COIN_NUM(0x30) slot=%u amount=%u -> coin1=%u", slotCount, (amountMSB << 8) + amountLSB, m_coin1); // TEMP diag
 
 			(*output++) = JVS_CMD_SUCCESS;
 
@@ -1049,8 +1054,11 @@ void do_jvs_packet(const u8* input, u8* output) {
 		}
 		break;
 		default:
-			//Unknown command
-			// Console.Error("ACJV::%s: unknown JVS CMD 0x%X", __FUNCTION__, cmd);
+			//Unknown command — cannot know its payload length, so the rest of this
+			// packet can no longer be parsed safely. Stop to avoid reinterpreting
+			// payload bytes as further commands (which can corrupt the coin counter).
+			Console.Warning("ACJV-DIAG: unknown JVS CMD 0x%02X (stopping packet parse)", cmd); // TEMP diag
+			inSize = 0;
 			break;
 		}
 	}
