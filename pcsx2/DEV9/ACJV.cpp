@@ -9,6 +9,7 @@
 #include "common/SettingsInterface.h"
 #include <array>
 #include <atomic>
+#include <cstdio>
 #include <string>
 
 enum ACJVCMD {
@@ -681,6 +682,23 @@ void do_jvs_packet(const u8* input, u8* output) {
 	u8* dstSize = output++;
 	(*dstSize) = 1;
 	(*output++) = JVS_CMD_SUCCESS;
+	// TEMP diag: dump the raw command stream of the first packets that contain a
+	// 0x70 command, so we can see command order and 0x70's payload/length.
+	{
+		static int s_diag_dumps_left = 12;
+		bool has70 = false;
+		for (u8 n = 0; n < inSize; n++)
+			if (input[n] == 0x70) { has70 = true; break; }
+		if (has70 && s_diag_dumps_left > 0)
+		{
+			s_diag_dumps_left--;
+			char buf[256];
+			int p = 0;
+			for (u8 n = 0; n < inSize && p < 240; n++)
+				p += std::snprintf(buf + p, sizeof(buf) - p, "%02X ", input[n]);
+			Console.WriteLn("ACJV-DIAG: pkt dest=%02X size=%u cmds: %s", inDest, inSize, buf);
+		}
+	}
 	while(inSize != 0) {
 		u8 cmd = (*input++);
 		inSize--;
