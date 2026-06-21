@@ -73,6 +73,20 @@ enum class StandardLayout {
 #define JVS_WHEEL_CHANNEL_MAX 3
 #define JVS_DRUM_CHANNEL_MAX 8
 
+enum JVSDrumChannel : u16 {
+	// Taiko's JVS analog channels are interleaved by the game, not laid out as
+	// P1-left/P1-right/P2-left/P2-right. These values are the game-observed
+	// channel indexes for each physical drum zone.
+	JVS_DRUM_CHANNEL_1P_DL = 0, // Player 1 Don Left / left men
+	JVS_DRUM_CHANNEL_1P_KL = 5, // Player 1 Ka Left / left fuchi
+	JVS_DRUM_CHANNEL_1P_DR = 3, // Player 1 Don Right / right men
+	JVS_DRUM_CHANNEL_1P_KR = 4, // Player 1 Ka Right / right fuchi
+	JVS_DRUM_CHANNEL_2P_DL = 2, // Player 2 Don Left / left men
+	JVS_DRUM_CHANNEL_2P_KL = 1, // Player 2 Ka Left / left fuchi
+	JVS_DRUM_CHANNEL_2P_DR = 7, // Player 2 Don Right / right men
+	JVS_DRUM_CHANNEL_2P_KR = 6, // Player 2 Ka Right / right fuchi
+};
+
 struct GunMapping {
     u16 pedal;
     u16 sensor;

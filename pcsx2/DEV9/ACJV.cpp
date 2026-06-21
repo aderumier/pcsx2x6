@@ -140,6 +140,40 @@ static constexpr const std::array<InputBindingInfo, 14> s_twinstick_p1_button_bi
 	{"P1_Service",     TRANSLATE_NOOP("JVS", "P1 Service"),          nullptr, InputBindingInfo::Type::Button,   JVS_BTN_SERVICE, GenericInputBinding::Select},
 }};
 
+static constexpr const std::array<InputBindingInfo, 14> s_jvs_p1_drum_bindings = {{
+	{"P1_DrumDonLeft",  TRANSLATE_NOOP("JVS", "P1 Drum Don Left (Men)"),   nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_1P_DL, GenericInputBinding::L1},
+	{"P1_DrumKaLeft",   TRANSLATE_NOOP("JVS", "P1 Drum Ka Left (Fuchi)"),   nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_1P_KL, GenericInputBinding::L2},
+	{"P1_DrumDonRight", TRANSLATE_NOOP("JVS", "P1 Drum Don Right (Men)"),  nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_1P_DR, GenericInputBinding::R1},
+	{"P1_DrumKaRight",  TRANSLATE_NOOP("JVS", "P1 Drum Ka Right (Fuchi)"), nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_1P_KR, GenericInputBinding::R2},
+	{"P1_Up",           TRANSLATE_NOOP("JVS", "P1 Up"),                    nullptr, InputBindingInfo::Type::Button, JVS_BTN_UP,             GenericInputBinding::DPadUp},
+	{"P1_Down",         TRANSLATE_NOOP("JVS", "P1 Down"),                  nullptr, InputBindingInfo::Type::Button, JVS_BTN_DOWN,           GenericInputBinding::DPadDown},
+	{"P1_Left",         TRANSLATE_NOOP("JVS", "P1 Left"),                  nullptr, InputBindingInfo::Type::Button, JVS_BTN_LEFT,           GenericInputBinding::DPadLeft},
+	{"P1_Right",        TRANSLATE_NOOP("JVS", "P1 Right"),                 nullptr, InputBindingInfo::Type::Button, JVS_BTN_RIGHT,          GenericInputBinding::DPadRight},
+	{"P1_SelectSW",     TRANSLATE_NOOP("JVS", "P1 Select SW"),             nullptr, InputBindingInfo::Type::Button, JVS_BTN_1,              GenericInputBinding::Select},
+	{"P1_EnterSW",      TRANSLATE_NOOP("JVS", "P1 Enter SW"),              nullptr, InputBindingInfo::Type::Button, JVS_BTN_2,              GenericInputBinding::Start},
+	{"P1_Button4",      TRANSLATE_NOOP("JVS", "P1 Button 4"),              nullptr, InputBindingInfo::Type::Button, JVS_BTN_4,              GenericInputBinding::Cross},
+	{"P1_Button5",      TRANSLATE_NOOP("JVS", "P1 Button 5"),              nullptr, InputBindingInfo::Type::Button, JVS_BTN_5,              GenericInputBinding::Circle},
+	{"P1_Start",        TRANSLATE_NOOP("JVS", "P1 Start"),                 nullptr, InputBindingInfo::Type::Button, JVS_BTN_START,          GenericInputBinding::Start},
+	{"P1_Service",      TRANSLATE_NOOP("JVS", "P1 Service"),               nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE,        GenericInputBinding::Select},
+}};
+
+static constexpr const std::array<InputBindingInfo, 14> s_jvs_p2_drum_bindings = {{
+	{"P2_DrumDonLeft",  TRANSLATE_NOOP("JVS", "P2 Drum Don Left (Men)"),   nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_2P_DL, GenericInputBinding::L1},
+	{"P2_DrumKaLeft",   TRANSLATE_NOOP("JVS", "P2 Drum Ka Left (Fuchi)"),   nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_2P_KL, GenericInputBinding::L2},
+	{"P2_DrumDonRight", TRANSLATE_NOOP("JVS", "P2 Drum Don Right (Men)"),  nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_2P_DR, GenericInputBinding::R1},
+	{"P2_DrumKaRight",  TRANSLATE_NOOP("JVS", "P2 Drum Ka Right (Fuchi)"), nullptr, InputBindingInfo::Type::Button, JVS_DRUM_CHANNEL_2P_KR, GenericInputBinding::R2},
+	{"P2_Up",           TRANSLATE_NOOP("JVS", "P2 Up"),                    nullptr, InputBindingInfo::Type::Button, JVS_BTN_UP,             GenericInputBinding::DPadUp},
+	{"P2_Down",         TRANSLATE_NOOP("JVS", "P2 Down"),                  nullptr, InputBindingInfo::Type::Button, JVS_BTN_DOWN,           GenericInputBinding::DPadDown},
+	{"P2_Left",         TRANSLATE_NOOP("JVS", "P2 Left"),                  nullptr, InputBindingInfo::Type::Button, JVS_BTN_LEFT,           GenericInputBinding::DPadLeft},
+	{"P2_Right",        TRANSLATE_NOOP("JVS", "P2 Right"),                 nullptr, InputBindingInfo::Type::Button, JVS_BTN_RIGHT,          GenericInputBinding::DPadRight},
+	{"P2_SelectSW",     TRANSLATE_NOOP("JVS", "P2 Select SW"),             nullptr, InputBindingInfo::Type::Button, JVS_BTN_1,              GenericInputBinding::Select},
+	{"P2_EnterSW",      TRANSLATE_NOOP("JVS", "P2 Enter SW"),              nullptr, InputBindingInfo::Type::Button, JVS_BTN_2,              GenericInputBinding::Start},
+	{"P2_Button4",      TRANSLATE_NOOP("JVS", "P2 Button 4"),              nullptr, InputBindingInfo::Type::Button, JVS_BTN_4,              GenericInputBinding::Cross},
+	{"P2_Button5",      TRANSLATE_NOOP("JVS", "P2 Button 5"),              nullptr, InputBindingInfo::Type::Button, JVS_BTN_5,              GenericInputBinding::Circle},
+	{"P2_Start",        TRANSLATE_NOOP("JVS", "P2 Start"),                 nullptr, InputBindingInfo::Type::Button, JVS_BTN_START,          GenericInputBinding::Start},
+	{"P2_Service",      TRANSLATE_NOOP("JVS", "P2 Service"),               nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE,        GenericInputBinding::Select},
+}};
+
 // Per-layout face button default inputs (BTN1-6), mirroring each game's
 // official PS2 port pad. Some games share the same layout. Rows follow FightingLayout order.
 static constexpr GenericInputBinding s_fighting_face_buttons[][6] = {
@@ -355,6 +389,8 @@ std::span<const InputBindingInfo> ACJV::GetButtonBindings()
 {
 	if (m_jvsMode == JVS_MODE::TWINSTICK)
 		return s_twinstick_p1_button_bindings;
+	if (m_jvsMode == JVS_MODE::DRUM)
+		return s_jvs_p1_drum_bindings;
 	if (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE || m_jvsMode == JVS_MODE::STANDARD)
 		return s_active_p1_bindings;
 	return s_jvs_p1_button_bindings;
@@ -363,6 +399,8 @@ std::span<const InputBindingInfo> ACJV::GetButtonBindings()
 std::span<const InputBindingInfo> ACJV::GetP2ButtonBindings()
 {
 	// Twin-stick (Zoids) is 1 player per cabinet (versus is networked), so no P2 layout.
+	if (m_jvsMode == JVS_MODE::DRUM)
+		return s_jvs_p2_drum_bindings;
 	if (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE || m_jvsMode == JVS_MODE::STANDARD)
 		return s_active_p2_bindings;
 	return s_jvs_p2_button_bindings;
@@ -444,6 +482,10 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 		for (const InputBindingInfo& bi : s_jvs_p2_button_bindings)
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		for (const InputBindingInfo& bi : s_jvs_p1_drum_bindings)
+			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		for (const InputBindingInfo& bi : s_jvs_p2_drum_bindings)
+			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 		for (const InputBindingInfo& bi : s_jvs_coin_bindings)
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 	}
@@ -497,6 +539,11 @@ static float m_jvsLightgunDX[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normal
 static float m_jvsLightgunDY[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normalized display Y (-1 = off-screen)
 static u16 m_jvsWheelChannels[JVS_WHEEL_CHANNEL_MAX] = {};
 static u16 m_jvsDrumChannels[JVS_DRUM_CHANNEL_MAX] = {};
+static bool m_jvsDrumPressed[JVS_DRUM_CHANNEL_MAX] = {};
+static u8 m_jvsDrumPulseReads[JVS_DRUM_CHANNEL_MAX] = {};
+
+static constexpr u8 JVS_DRUM_PULSE_READS = 3;
+static constexpr u16 JVS_DRUM_PRESS_VALUE = 0x3FF << 6; // 10-bit max value, left-aligned in JVS' 16-bit analog word.
 
 static float m_wheelSteerR = 0.0f; // stick right  -> steering positive
 static float m_wheelSteerL = 0.0f; // stick left   -> steering negative
@@ -560,6 +607,23 @@ void ACJV::SetButtonState(u32 player, u16 mask, bool pressed)
 {
 	if (player >= JVS_PLAYER_COUNT)
 		return;
+
+	if (m_jvsMode == JVS_MODE::DRUM && mask < JVS_DRUM_CHANNEL_MAX)
+	{
+		// Taiko drum inputs are hits, not level-sensitive buttons. Input backends
+		// can deliver fast press/release pairs between two JVS polls, especially
+		// during rolls or simultaneous left/right hits. Latch each rising edge for
+		// a few analog reads so the game cannot miss it, but keep each channel
+		// independent so left/right Don or Ka can be hit together.
+		if (pressed && !m_jvsDrumPressed[mask])
+		{
+			m_jvsDrumChannels[mask] = JVS_DRUM_PRESS_VALUE;
+			m_jvsDrumPulseReads[mask] = JVS_DRUM_PULSE_READS;
+		}
+		m_jvsDrumPressed[mask] = pressed;
+		return;
+	}
+
 	if (pressed)
 		m_jvsButtonState[player] |= mask;
 	else
@@ -677,6 +741,8 @@ void ACJV::SetGameId(const std::string& gameid)
 	}
 	std::memset(m_jvsWheelChannels, 0, sizeof(m_jvsWheelChannels));
 	std::memset(m_jvsDrumChannels, 0, sizeof(m_jvsDrumChannels));
+	std::memset(m_jvsDrumPressed, 0, sizeof(m_jvsDrumPressed));
+	std::memset(m_jvsDrumPulseReads, 0, sizeof(m_jvsDrumPulseReads));
 
 	// Select per-game gun mapping, or fall back to default
 	auto it = s_gun_mappings.find(gameid);
@@ -883,8 +949,6 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 				(*dstSize) += 12;
 			}
-			// TODO: drum games (e.g. Taiko no Tatsujin)
-#if 0
 			else if(m_jvsMode == JVS_MODE::DRUM)
 			{
 				(*output++) = 0x03;                 //Analog Input
@@ -894,7 +958,6 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 				(*dstSize) += 4;
 			}
-#endif
 			// TODO: touch panel games
 #if 0
 			else if(m_jvsMode == JVS_MODE::TOUCH)
@@ -1048,6 +1111,12 @@ void do_jvs_packet(const u8* input, u8* output) {
 				{
 					(*output++) = static_cast<u8>(m_jvsDrumChannels[i] >> 8);
 					(*output++) = static_cast<u8>(m_jvsDrumChannels[i]);
+					if (m_jvsDrumPulseReads[i] > 0)
+					{
+						m_jvsDrumPulseReads[i]--;
+						if (m_jvsDrumPulseReads[i] == 0)
+							m_jvsDrumChannels[i] = 0;
+					}
 				}
 			}
 			else if(m_jvsMode == JVS_MODE::DRIVE)

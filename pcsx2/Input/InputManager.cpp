@@ -912,7 +912,7 @@ void InputManager::AddJVSBindings(SettingsInterface& si, bool is_profile)
 		for (const InputBindingInfo& jvs_bi : player_bindings[player])
 		{
 			if (jvs_bi.generic_mapping == GenericInputBinding::Unknown ||
-				jvs_bi.generic_mapping == GenericInputBinding::Select)
+				(jvs_bi.generic_mapping == GenericInputBinding::Select && !StringUtil::EndsWithNoCase(jvs_bi.name, "SelectSW")))
 				continue;
 
 			for (const InputBindingInfo& pad_bi : pad_ci->bindings)
