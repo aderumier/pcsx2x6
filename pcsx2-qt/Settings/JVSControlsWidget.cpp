@@ -25,6 +25,7 @@ JVSControlsWidget::JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* 
 
 	bindDIPSwitchWidgets();
 	bindSystemButtonWidgets();
+	bindDrivingControlWidgets();
 
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(m_dialog->getProfileSettingsInterface(), m_ui.suppressDaemon,
 		ACJV::CONFIG_SECTION, "SuppressDaemon", true);
@@ -89,6 +90,24 @@ void JVSControlsWidget::bindSystemButtonWidgets()
 		bind->setMinimumWidth(225);
 		bind->setMaximumWidth(225);
 		layout->addWidget(bind, i, 1);
+	}
+}
+
+
+void JVSControlsWidget::bindDrivingControlWidgets()
+{
+	QGridLayout* layout = m_ui.drivingControlsLayout;
+	SettingsInterface* sif = m_dialog->getProfileSettingsInterface();
+	for (const InputBindingInfo& bi : ACJV::GetWheelBindings())
+	{
+		const int row = static_cast<int>(bi.bind_index);
+		QLabel* label = new QLabel(
+			QCoreApplication::translate(ACJV::TRANSLATION_CONTEXT, bi.display_name), this);
+		layout->addWidget(label, row, 0);
+		InputBindingWidget* bind = new InputBindingWidget(this, sif, bi.bind_type, ACJV::CONFIG_SECTION, bi.name);
+		bind->setMinimumWidth(225);
+		bind->setMaximumWidth(225);
+		layout->addWidget(bind, row, 1);
 	}
 }
 

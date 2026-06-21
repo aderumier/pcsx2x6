@@ -147,6 +147,20 @@ static constexpr const std::array<InputBindingInfo, 2> s_jvs_coin_bindings = {{
 	{"Coin2", TRANSLATE_NOOP("JVS", "Insert Coin P2"), nullptr, InputBindingInfo::Type::Button, 1, GenericInputBinding::Unknown},
 }};
 
+// Driving game analog inputs.
+// Steering is split into two HalfAxis bindings (left + right). The binding widget
+// only auto-detects a full axis for controls that rest at an extreme (triggers/
+// pedals); a centered stick always captures as a half-axis, so we capture each
+// direction independently — mirroring PCSX2's own USB wheel (CID_STEERING_L/R).
+// They are combined into JVS channel 0: 0x0000=full left, 0x7FFF=center, 0xFFFF=full right.
+// bind_index 0=SteerLeft, 1=SteerRight, 2=Gas, 3=Brake.
+static constexpr const std::array<InputBindingInfo, 4> s_jvs_wheel_bindings = {{
+	{"WheelLeft",  TRANSLATE_NOOP("JVS", "Steer Left"),  nullptr, InputBindingInfo::Type::HalfAxis, 0, GenericInputBinding::Unknown},
+	{"WheelRight", TRANSLATE_NOOP("JVS", "Steer Right"), nullptr, InputBindingInfo::Type::HalfAxis, 1, GenericInputBinding::Unknown},
+	{"Gas",        TRANSLATE_NOOP("JVS", "Gas Pedal"),   nullptr, InputBindingInfo::Type::HalfAxis, 2, GenericInputBinding::Unknown},
+	{"Brake",      TRANSLATE_NOOP("JVS", "Brake Pedal"), nullptr, InputBindingInfo::Type::HalfAxis, 3, GenericInputBinding::Unknown},
+}};
+
 static u16 s_dip_switch_state = DEFAULT_DIP_SWITCH_STATE;
 static bool s_suppress_daemon = true;
 static std::atomic<bool> s_sinden_border_enabled{false};
@@ -225,6 +239,11 @@ std::span<const InputBindingInfo> ACJV::GetCoinBindings()
 	return s_jvs_coin_bindings;
 }
 
+std::span<const InputBindingInfo> ACJV::GetWheelBindings()
+{
+	return s_jvs_wheel_bindings;
+}
+
 bool ACJV::GetDIPSwitchState(u32 index)
 {
 	return (index < s_dip_switch_masks.size()) && ((s_dip_switch_state & s_dip_switch_masks[index]) != 0);
@@ -293,6 +312,8 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 		for (const InputBindingInfo& bi : s_jvs_coin_bindings)
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		for (const InputBindingInfo& bi : s_jvs_wheel_bindings)
+			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 	}
 }
 
@@ -341,6 +362,8 @@ static u16 m_jvsScreenPosY[JVS_GUN_COUNT] = {};
 static float m_jvsLightgunDX[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normalized display X (-1 = off-screen)
 static float m_jvsLightgunDY[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normalized display Y (-1 = off-screen)
 static u16 m_jvsWheelChannels[JVS_WHEEL_CHANNEL_MAX] = {};
+static float m_jvsWheelLeft = 0.0f;  // 0..+1, how far steering is turned left
+static float m_jvsWheelRight = 0.0f; // 0..+1, how far steering is turned right
 static u16 m_jvsDrumChannels[JVS_DRUM_CHANNEL_MAX] = {};
 
 // Per-game JVS button mapping for lightgun games, keyed by NM game ID (see issue #9).
@@ -457,7 +480,43 @@ void ACJV::SetGunPosition(u32 gun, float dx, float dy, bool on_screen)
 		ACJV::SetButtonState(gun, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
 }
 
+
 // Called from VMManager on game boot. Resets all JVS state and selects per-game I/O config.
+void ACJV::SetWheelChannel(u32 channel, float value)
+{
+	switch (channel)
+	{
+		case 0: // Steer Left  (HalfAxis 0..+1)
+			m_jvsWheelLeft = value;
+			// Combine left+right into JVS ch0: (0.5 + (right - left) * 0.5) * 0xFFFF
+			// 0x0000=full left, 0x7FFF=center, 0xFFFF=full right.
+			m_jvsWheelChannels[0] = static_cast<u16>((0.5f + (m_jvsWheelRight - m_jvsWheelLeft) * 0.5f) * 0xFFFF);
+			break;
+		case 1: // Steer Right (HalfAxis 0..+1)
+			m_jvsWheelRight = value;
+			m_jvsWheelChannels[0] = static_cast<u16>((0.5f + (m_jvsWheelRight - m_jvsWheelLeft) * 0.5f) * 0xFFFF);
+			break;
+		case 2: // Gas Pedal   (HalfAxis 0..+1 → 0x0000..0xFFFF)
+			m_jvsWheelChannels[1] = static_cast<u16>(value * 0xFFFF);
+			break;
+		case 3: // Brake Pedal (HalfAxis 0..+1 → 0x0000..0xFFFF)
+			m_jvsWheelChannels[2] = static_cast<u16>(value * 0xFFFF);
+			break;
+		default:
+			break;
+	}
+}
+
+// Driving games that use JVS_MODE::DRIVE (3-channel analog: steering/gas/brake).
+// Used by SetGameId to auto-detect mode when jvsmode= is absent from the ACGAME ini.
+static const std::map<std::string, const char*> s_driving_game_ids = {
+	{"NM00005", "Wangan Midnight R"},
+	{"NM00008", "Wangan Midnight"},
+	{"NM00010", "Battle Gear 3"},
+	{"NM00015", "Battle Gear 3 Tuned"},
+	{"NM00047", "Ace Driver 3 - Final Turn"},
+};
+
 const std::string& ACJV::GetGameId() { return s_gameid; }
 
 void ACJV::SetGameId(const std::string& gameid)
@@ -478,6 +537,9 @@ void ACJV::SetGameId(const std::string& gameid)
 		m_jvsLightgunDY[i] = -1.0f;
 	}
 	std::memset(m_jvsWheelChannels, 0, sizeof(m_jvsWheelChannels));
+	m_jvsWheelChannels[0] = 0x7FFF; // Steering center (0x0000=full left, 0x7FFF=center, 0xFFFF=full right)
+	m_jvsWheelLeft = 0.0f;
+	m_jvsWheelRight = 0.0f;
 	std::memset(m_jvsDrumChannels, 0, sizeof(m_jvsDrumChannels));
 
 	// Select per-game gun mapping, or fall back to default
@@ -496,6 +558,19 @@ void ACJV::SetGameId(const std::string& gameid)
 		constexpr const char* layout_names[] = {"tekken", "gundam", "6-button", "soulcalibur", "bloodyroar"};
 		Console.WriteLn("ACJV: fighting layout for %s: %s", gameid.c_str(), layout_names[static_cast<int>(fit->second)]);
 		UpdateFightingBindings(fit->second);
+	}
+
+	// Auto-detect DRIVE mode for known driving games when jvsmode= is absent from the ini.
+	// VMManager calls SetGameId BEFORE SetMode, so at this point mode may still be DEFAULT.
+	// Only auto-detect here; VMManager will call SetMode(DRIVE) after if jvsmode=driving is set.
+	if (m_jvsMode == JVS_MODE::DEFAULT)
+	{
+		auto dit = s_driving_game_ids.find(gameid);
+		if (dit != s_driving_game_ids.end())
+		{
+			Console.WriteLn("ACJV: auto-detected driving mode for %s (%s)", gameid.c_str(), dit->second);
+			SetMode(JVS_MODE::DRIVE);
+		}
 	}
 
 	// TC3 has 3 I/O boards: TSS-I/O (white flash), MIU-I/O (640x224), RAYS PCB (0xFFFF).
@@ -612,8 +687,6 @@ void do_jvs_packet(const u8* input, u8* output) {
 			(*output++) = JVS_PLAYER_COUNT; //2 players
 			(*output++) = 0x10;             //16 switches
 			(*output++) = 0x00;
-			// TODO: driving games (e.g. Wangan Midnight)
-#if 0
 			if(m_jvsMode == JVS_MODE::DRIVE)
 			{
 				(*output++) = 0x03;                  //Analog Input
@@ -622,9 +695,7 @@ void do_jvs_packet(const u8* input, u8* output) {
 				(*output++) = 0x00;
 				(*dstSize) += 4;
 			}
-			else
-#endif
-			if(m_jvsMode == JVS_MODE::LIGHTGUN)
+			else if(m_jvsMode == JVS_MODE::LIGHTGUN)
 			{
 				(*output++) = 0x06; //Screen Pos Input
 				(*output++) = 0x10; //X pos bits

@@ -114,6 +114,15 @@
         </layout>
        </item>
 
+       <!-- Driving Controls (full width, dynamically populated) -->
+       <item>
+        <widget class="QGroupBox" name="drivingControlsGroup">
+         <property name="title"><string>Driving Controls</string></property>
+         <layout class="QGridLayout" name="drivingControlsLayout" columnstretch="1,0">
+         </layout>
+        </widget>
+       </item>
+
        <!-- System Settings (full width) -->
        <item>
         <widget class="QGroupBox" name="systemSettingsGroup">

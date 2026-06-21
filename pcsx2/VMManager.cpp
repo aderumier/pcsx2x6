@@ -1325,7 +1325,6 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 					return false;
 				}
 
-				ACJV::SetGameId(s_serial); // Adapt JVS input to detected GAMEID
 				std::string platform = INI.GetStringValue("game", "platform", "");
 				s_acgame_sys246 = (platform == "246" || platform == "256" || platform == "super256");
 				s_acgame_sys256 = (platform == "256" || platform == "super256");
@@ -1393,9 +1392,19 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 						ACJV::SetMode(JVS_MODE::FIGHTING);
 						Console.WriteLn(Color_Green, "ACGAME: jvsmode=fighting");
 					}
+					else if (jvsmode == "driving")
+					{
+						ACJV::SetMode(JVS_MODE::DRIVE);
+						Console.WriteLn(Color_Green, "ACGAME: jvsmode=driving");
+					}
 					else
 						ACJV::SetMode(JVS_MODE::DEFAULT);
 				}
+
+				// SetGameId AFTER SetMode so auto-detection in SetGameId sees the mode
+				// from the ini first. If jvsmode= is absent, the auto-detect override
+				// (e.g. DRIVE for known driving game IDs) will correctly take effect.
+				ACJV::SetGameId(s_serial);
 
 				ACATA::SetEnv(basedir, s_imgname, s_acmedia);
 				int R;

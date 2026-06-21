@@ -960,6 +960,24 @@ void InputManager::AddJVSBindings(SettingsInterface& si, bool is_profile)
 				ACJV::InsertCoin(slot);
 		}}, InputBindingInfo::Type::Button, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
+
+	// Driving game wheel/pedal bindings (all HalfAxis, 0..+1).
+	// SteerLeft/SteerRight are combined in SetWheelChannel into JVS ch0.
+	// Gas=bind 2, Brake=bind 3 map directly to JVS ch1, ch2.
+	for (const InputBindingInfo& bi : ACJV::GetWheelBindings())
+	{
+		const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, bi.name));
+		if (bindings.empty())
+			continue;
+
+		const u32 channel = static_cast<u32>(bi.bind_index);
+		// Steering (Axis, -1..+1) and pedals (HalfAxis, 0..+1) both pass value directly.
+		// SetWheelChannel applies signed mapping for ch0 (steering) and unsigned for ch1/ch2.
+		AddBindings(bindings, InputAxisEventHandler{[channel](InputBindingKey, float value) {
+			ACJV::SetWheelChannel(channel, value);
+		}}, bi.bind_type, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
+	}
+
 }
 
 void InputManager::AddPadBindings(SettingsInterface& si, u32 pad_index, bool is_profile)

@@ -99,8 +99,11 @@ namespace ACJV {
     std::span<const InputBindingInfo> GetButtonBindings();
     std::span<const InputBindingInfo> GetP2ButtonBindings();
     std::span<const InputBindingInfo> GetCoinBindings();
+    std::span<const InputBindingInfo> GetWheelBindings();
     void SetButtonState(u32 player, u16 mask, bool pressed);
     void InsertCoin(u32 slot);
+    // Set a driving analog channel. channel: 0=steering, 1=gas, 2=brake. value: 0.0–1.0.
+    void SetWheelChannel(u32 channel, float value);
 
     bool GetDIPSwitchState(u32 index);
     void SetDIPSwitchState(u32 index, bool enabled);
