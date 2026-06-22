@@ -235,12 +235,13 @@ namespace EvdevGun
 		if (!ctx)
 			return devices;
 
-		udev_enumerate* const en = udev_enumerate_new(ctx);
-		if (en)
-		{
-			// Only devices udev tagged as guns (ID_INPUT_GUN=1), matching Batocera.
+		// Collect every input event node tagged with the given udev property.
+		const auto scan = [&](const char* id_property) {
+			udev_enumerate* const en = udev_enumerate_new(ctx);
+			if (!en)
+				return;
 			udev_enumerate_add_match_subsystem(en, "input");
-			udev_enumerate_add_match_property(en, "ID_INPUT_GUN", "1");
+			udev_enumerate_add_match_property(en, id_property, "1");
 			udev_enumerate_scan_devices(en);
 
 			udev_list_entry* dev_entry;
@@ -264,7 +265,16 @@ namespace EvdevGun
 				udev_device_unref(dev);
 			}
 			udev_enumerate_unref(en);
-		}
+		};
+
+		// Batocera tags dedicated light guns ID_INPUT_GUN=1. Wii/IR setups instead
+		// expose the pointer as a virtual mouse (the wii "mouse bar"), so fall back to
+		// mice when no gun is tagged — mirroring the RPCS3 light gun handler. The
+		// mouse fallback is only tried if no gun matched, so a real gun is never mixed
+		// with (or hidden by) the desktop mouse. The reader auto-detects abs vs rel.
+		scan("ID_INPUT_GUN");
+		if (devices.empty())
+			scan("ID_INPUT_MOUSE");
 		udev_unref(ctx);
 
 		// Sort by event-node number (event2 before event10), matching Batocera, so
