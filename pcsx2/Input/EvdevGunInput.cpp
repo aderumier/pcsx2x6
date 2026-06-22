@@ -229,14 +229,15 @@ namespace EvdevGun
 
 	std::vector<std::pair<std::string, std::string>> EnumerateDevices()
 	{
-		std::vector<std::pair<std::string, std::string>> devices;
+		using DeviceList = std::vector<std::pair<std::string, std::string>>;
+		DeviceList devices;
 
 		udev* const ctx = udev_new();
 		if (!ctx)
 			return devices;
 
-		// Collect every input event node tagged with the given udev property.
-		const auto scan = [&](const char* id_property) {
+		// Collect every input event node tagged with the given udev property into `out`.
+		const auto scan = [&](const char* id_property, DeviceList& out) {
 			udev_enumerate* const en = udev_enumerate_new(ctx);
 			if (!en)
 				return;
@@ -259,7 +260,7 @@ namespace EvdevGun
 					const char* name = nullptr;
 					if (udev_device* parent = udev_device_get_parent(dev))
 						name = udev_device_get_sysattr_value(parent, "name");
-					devices.emplace_back(devnode, name && name[0] ? name : "Light Gun");
+					out.emplace_back(devnode, name && name[0] ? name : "Light Gun");
 				}
 
 				udev_device_unref(dev);
@@ -268,13 +269,12 @@ namespace EvdevGun
 		};
 
 		// Batocera tags dedicated light guns ID_INPUT_GUN=1. Wii/IR setups instead
-		// expose the pointer as a virtual mouse (the wii "mouse bar"), so fall back to
-		// mice when no gun is tagged — mirroring the RPCS3 light gun handler. The
-		// mouse fallback is only tried if no gun matched, so a real gun is never mixed
-		// with (or hidden by) the desktop mouse. The reader auto-detects abs vs rel.
-		scan("ID_INPUT_GUN");
-		if (devices.empty())
-			scan("ID_INPUT_MOUSE");
+		// expose the pointer as a virtual mouse (the wii "mouse bar"), with no gun tag.
+		// Gather both so mixed rigs work (e.g. a real gun on P1 + a wiimote on P2),
+		// mirroring the RPCS3 light gun handler. The reader auto-detects abs vs rel.
+		DeviceList guns, mice;
+		scan("ID_INPUT_GUN", guns);
+		scan("ID_INPUT_MOUSE", mice);
 		udev_unref(ctx);
 
 		// Sort by event-node number (event2 before event10), matching Batocera, so
@@ -285,13 +285,27 @@ namespace EvdevGun
 				return -1;
 			return std::strtol(path.c_str() + pos + 1, nullptr, 10);
 		};
-		std::sort(devices.begin(), devices.end(), [&](const auto& a, const auto& b) {
-			const long na = event_number(a.first), nb = event_number(b.first);
-			return (na != nb) ? (na < nb) : (a.first < b.first);
-		});
-		devices.erase(std::unique(devices.begin(), devices.end(),
-						  [](const auto& a, const auto& b) { return a.first == b.first; }),
-			devices.end());
+		const auto sort_unique = [&](DeviceList& v) {
+			std::sort(v.begin(), v.end(), [&](const auto& a, const auto& b) {
+				const long na = event_number(a.first), nb = event_number(b.first);
+				return (na != nb) ? (na < nb) : (a.first < b.first);
+			});
+			v.erase(std::unique(v.begin(), v.end(),
+						[](const auto& a, const auto& b) { return a.first == b.first; }),
+				v.end());
+		};
+		sort_unique(guns);
+		sort_unique(mice);
+
+		// Guns take the low player slots (P1 first); mice fill the rest. A device
+		// tagged as both a gun and a mouse stays a gun (skip its mouse duplicate).
+		devices = std::move(guns);
+		for (auto& m : mice)
+		{
+			if (std::none_of(devices.begin(), devices.end(),
+					[&](const auto& d) { return d.first == m.first; }))
+				devices.push_back(std::move(m));
+		}
 		return devices;
 	}
 
