@@ -277,8 +277,8 @@ namespace EvdevGun
 		scan("ID_INPUT_MOUSE", mice);
 		udev_unref(ctx);
 
-		// Sort by event-node number (event2 before event10), matching Batocera, so
-		// autodetect-by-order is stable and intuitive.
+		// Sort by event-node number (event2 before event10), matching Batocera, so the
+		// per-player numdevice index is stable and intuitive across runs.
 		const auto event_number = [](const std::string& path) -> long {
 			const size_t pos = path.find_last_not_of("0123456789");
 			if (pos == std::string::npos || pos + 1 >= path.size())
@@ -313,11 +313,15 @@ namespace EvdevGun
 	{
 		const std::vector<std::pair<std::string, std::string>> devices = EnumerateDevices();
 
-		// Batocera selection: gun N defaults to the N-th sorted gun; a numdevice >= 0
-		// overrides that with an explicit index into the list.
+		// Grab only the device the user explicitly assigned to this slot (numdevice >= 0,
+		// an index into the sorted list). We deliberately do NOT autodetect by position:
+		// a desktop mouse and a relative USB mouse used as a gun are indistinguishable at
+		// the evdev level, so grabbing "the first device" would steal the desktop mouse and
+		// break the GUI. A slot left at -1 stays ungrabbed and falls back to the system
+		// mouse (pointer 0).
 		for (u32 gun = 0; gun < NUM_GUNS; gun++)
 		{
-			const int index = (numdevice[gun] >= 0) ? numdevice[gun] : static_cast<int>(gun);
+			const int index = numdevice[gun];
 			const std::string path =
 				(index >= 0 && static_cast<size_t>(index) < devices.size()) ? devices[index].first : std::string();
 			Start(gun, path);

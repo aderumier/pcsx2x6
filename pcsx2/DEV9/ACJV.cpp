@@ -332,8 +332,10 @@ static std::atomic<bool> s_sinden_border_enabled{false};
 static std::atomic<int> s_sinden_border_mode{0};
 static std::atomic<int> s_sinden_border_thickness{10};
 static std::string s_gameid;
-// Per-player light gun device index (Batocera "numdevice"): -1 = autodetect by order,
-// >= 0 = explicit index into the sorted ID_INPUT_GUN list. Read from [USB1]/[USB2].
+// Per-player light gun device index (Batocera "numdevice"): -1 = unassigned (slot stays
+// on the system mouse), >= 0 = explicit index into the sorted device list. Read from
+// [USB1]/[USB2]. We never autodetect by position, so a relative USB mouse used as a gun
+// must be assigned here rather than guessed (which would steal the desktop mouse).
 static std::array<int, EvdevGun::NUM_GUNS> s_gun_numdevice = {-1, -1};
 
 std::span<const ACJV::DIPSwitchInfo> ACJV::GetDIPSwitches()
@@ -646,8 +648,8 @@ void ACJV::SetMode(JVS_MODE mode)
 {
 	m_jvsMode = mode;
 
-	// Grab the dedicated gun devices only while a light gun game is running.
-	// Devices auto-detect by order; per-player numdevice indices override (Batocera).
+	// Grab the assigned gun devices only while a light gun game is running. Only slots
+	// with an explicit per-player numdevice are grabbed; unassigned slots use the system mouse.
 	if (mode == JVS_MODE::LIGHTGUN)
 		EvdevGun::StartGuns(s_gun_numdevice);
 	else
