@@ -1698,6 +1698,21 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 		s_sys256_mode = true;
 		Console.WriteLnFmt(Color_Green, "S256: bus clock 393MHz, IOP 49MHz");
 	}
+	if (ACJV::GetMode() == JVS_MODE::DRUM)
+	{
+		// Keep the real System 256 clock, but avoid adding avoidable host-side
+		// buffering for Taiko. Drum input is rhythm-critical, so trim the GS frame
+		// queue and SPU2 buffering at runtime instead of changing the arcade
+		// platform mode that games validate during boot.
+		if (EmuConfig.GS.VsyncQueueSize > 1)
+			EmuConfig.GS.VsyncQueueSize = 1;
+		if (EmuConfig.SPU2.StreamParameters.buffer_ms > 25)
+			EmuConfig.SPU2.StreamParameters.buffer_ms = 25;
+		if (EmuConfig.SPU2.StreamParameters.output_latency_ms > 10)
+			EmuConfig.SPU2.StreamParameters.output_latency_ms = 10;
+		EmuConfig.SPU2.StreamParameters.minimal_output_latency = true;
+		Console.WriteLn(Color_Green, "ACGAME: jvsmode=drum -> low-latency GS/SPU2 buffering");
+	}
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	Internal::ClearCPUExecutionCaches();
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);

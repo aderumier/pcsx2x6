@@ -542,7 +542,7 @@ static u16 m_jvsDrumChannels[JVS_DRUM_CHANNEL_MAX] = {};
 static bool m_jvsDrumPressed[JVS_DRUM_CHANNEL_MAX] = {};
 static u8 m_jvsDrumPulseReads[JVS_DRUM_CHANNEL_MAX] = {};
 
-static constexpr u8 JVS_DRUM_PULSE_READS = 3;
+static constexpr u8 JVS_DRUM_PULSE_READS = 1;
 static constexpr u16 JVS_DRUM_PRESS_VALUE = 0x3FF << 6; // 10-bit max value, left-aligned in JVS' 16-bit analog word.
 
 static float m_wheelSteerR = 0.0f; // stick right  -> steering positive
@@ -612,8 +612,11 @@ void ACJV::SetButtonState(u32 player, u16 mask, bool pressed)
 	{
 		// Taiko drum inputs are hits, not level-sensitive buttons. Input backends
 		// can deliver fast press/release pairs between two JVS polls, especially
-		// during rolls or simultaneous left/right hits. Latch each rising edge for
-		// a few analog reads so the game cannot miss it, but keep each channel
+		// during rolls or simultaneous left/right hits. Latch each rising edge until
+		// the next analog read so the game cannot miss it, but avoid holding
+		// the hit across multiple polls because Taiko treats that as a long
+		// sensor pulse and debounces following hits, which feels like latency.
+		// Keep each channel
 		// independent so left/right Don or Ka can be hit together.
 		if (pressed && !m_jvsDrumPressed[mask])
 		{
@@ -1107,6 +1110,13 @@ void do_jvs_packet(const u8* input, u8* output) {
 			else if(m_jvsMode == JVS_MODE::DRUM)
 			{
 				JVS_ASSERT(channel == JVS_DRUM_CHANNEL_MAX);
+
+				// Taiko polls drum hits through JVS analog reads. Poll host input here,
+				// immediately before returning the analog channels, instead of waiting
+				// for the next EE vsync input poll. This removes up to one frame of
+				// avoidable latency without changing System 256 timing accuracy.
+				InputManager::PollSources();
+
 				for(int i = 0; i < JVS_DRUM_CHANNEL_MAX; i++)
 				{
 					(*output++) = static_cast<u8>(m_jvsDrumChannels[i] >> 8);
