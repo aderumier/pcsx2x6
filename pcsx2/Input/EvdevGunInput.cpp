@@ -82,7 +82,7 @@ namespace EvdevGun
 		// Gun slot N feeds pointer index N + 1 (pointer 0 is reserved for the system mouse).
 		u32 PointerIndexFor(u32 gun) { return gun + 1; }
 
-		void ReaderThread(u32 gun, std::string device_path)
+		void ReaderThread(u32 gun, std::string device_path, bool exclusive)
 		{
 			GunSlot& slot = s_slots[gun];
 			const u32 pointer_index = PointerIndexFor(gun);
@@ -96,8 +96,10 @@ namespace EvdevGun
 				return;
 			}
 
-			// Grab exclusively so the gun no longer drives the desktop cursor.
-			if (ioctl(fd, EVIOCGRAB, 1) < 0)
+			// In-game we grab exclusively so the gun no longer drives the desktop cursor.
+			// For GUI button-binding we read the device shared (no grab): the press still
+			// reaches InputManager for binding, but the desktop mouse keeps working in Qt.
+			if (exclusive && ioctl(fd, EVIOCGRAB, 1) < 0)
 				Console.Warning("EvdevGun: could not grab '%s': %s", device_path.c_str(), std::strerror(errno));
 
 			// Real light guns usually report absolute axes; fall back to relative (mouse-like).
@@ -210,7 +212,8 @@ namespace EvdevGun
 				}
 			}
 
-			ioctl(fd, EVIOCGRAB, 0);
+			if (exclusive)
+				ioctl(fd, EVIOCGRAB, 0);
 			close(fd);
 			Console.WriteLn("EvdevGun: P%u gun stopped reading '%s'", gun + 1, device_path.c_str());
 			slot.running.store(false, std::memory_order_release);
@@ -277,8 +280,8 @@ namespace EvdevGun
 		scan("ID_INPUT_MOUSE", mice);
 		udev_unref(ctx);
 
-		// Sort by event-node number (event2 before event10), matching Batocera, so the
-		// per-player numdevice index is stable and intuitive across runs.
+		// Sort by event-node number (event2 before event10), matching Batocera, so
+		// autodetect-by-order is stable and intuitive.
 		const auto event_number = [](const std::string& path) -> long {
 			const size_t pos = path.find_last_not_of("0123456789");
 			if (pos == std::string::npos || pos + 1 >= path.size())
@@ -309,22 +312,18 @@ namespace EvdevGun
 		return devices;
 	}
 
-	void StartGuns(const std::array<int, NUM_GUNS>& numdevice)
+	void StartGuns(const std::array<int, NUM_GUNS>& numdevice, bool exclusive)
 	{
 		const std::vector<std::pair<std::string, std::string>> devices = EnumerateDevices();
 
-		// Grab only the device the user explicitly assigned to this slot (numdevice >= 0,
-		// an index into the sorted list). We deliberately do NOT autodetect by position:
-		// a desktop mouse and a relative USB mouse used as a gun are indistinguishable at
-		// the evdev level, so grabbing "the first device" would steal the desktop mouse and
-		// break the GUI. A slot left at -1 stays ungrabbed and falls back to the system
-		// mouse (pointer 0).
+		// Batocera selection: gun N defaults to the N-th sorted gun; a numdevice >= 0
+		// overrides that with an explicit index into the list.
 		for (u32 gun = 0; gun < NUM_GUNS; gun++)
 		{
-			const int index = numdevice[gun];
+			const int index = (numdevice[gun] >= 0) ? numdevice[gun] : static_cast<int>(gun);
 			const std::string path =
 				(index >= 0 && static_cast<size_t>(index) < devices.size()) ? devices[index].first : std::string();
-			Start(gun, path);
+			Start(gun, path, exclusive);
 		}
 	}
 
@@ -335,7 +334,7 @@ namespace EvdevGun
 		return 0; // fall back to the system mouse
 	}
 
-	bool Start(u32 gun, const std::string& device_path)
+	bool Start(u32 gun, const std::string& device_path, bool exclusive)
 	{
 		if (gun >= NUM_GUNS)
 			return false;
@@ -357,7 +356,7 @@ namespace EvdevGun
 		slot.device_path = device_path;
 		slot.stop.store(false, std::memory_order_release);
 		slot.running.store(true, std::memory_order_release);
-		slot.thread = std::thread(ReaderThread, gun, device_path);
+		slot.thread = std::thread(ReaderThread, gun, device_path, exclusive);
 		return true;
 	}
 
@@ -388,8 +387,8 @@ namespace EvdevGun
 {
 	std::vector<std::pair<std::string, std::string>> EnumerateDevices() { return {}; }
 	u32 PointerIndexForGun(u32) { return 0; }
-	void StartGuns(const std::array<int, NUM_GUNS>&) {}
-	bool Start(u32, const std::string&) { return false; }
+	void StartGuns(const std::array<int, NUM_GUNS>&, bool) {}
+	bool Start(u32, const std::string&, bool) { return false; }
 	void Stop(u32) {}
 	void StopAll() {}
 	bool IsRunning(u32) { return false; }

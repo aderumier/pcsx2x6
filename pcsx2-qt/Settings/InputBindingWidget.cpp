@@ -353,7 +353,10 @@ void InputBindingWidget::beginGunBindingCapture()
 	const std::array<int, EvdevGun::NUM_GUNS> numdevice = {
 		Host::GetBaseIntSettingValue("USB1", "guncon2_numdevice", -1),
 		Host::GetBaseIntSettingValue("USB2", "guncon2_numdevice", -1)};
-	EvdevGun::StartGuns(numdevice);
+	// Read the gun devices shared (no EVIOCGRAB) during binding capture: the gun/mouse
+	// press still reaches InputManager to be bound, but the desktop mouse stays usable
+	// in the Qt interface (the exclusive grab is only taken in-game, by ACJV).
+	EvdevGun::StartGuns(numdevice, /*exclusive=*/false);
 }
 
 void InputBindingWidget::endGunBindingCapture()
