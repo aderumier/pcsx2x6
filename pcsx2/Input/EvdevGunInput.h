@@ -39,16 +39,12 @@ namespace EvdevGun
 	// Start all gun slots, selecting devices Batocera-style from the sorted
 	// ID_INPUT_GUN list. numdevice[gun] < 0 auto-assigns by order (gun 0 = first
 	// gun, gun 1 = second, ...); numdevice[gun] >= 0 forces that list index.
-	// exclusive (default) grabs each device with EVIOCGRAB so it stops driving the
-	// desktop cursor (in-game). Pass false for GUI button-binding: the device is read
-	// shared so presses still reach InputManager, but the desktop mouse stays usable.
-	void StartGuns(const std::array<int, NUM_GUNS>& numdevice, bool exclusive = true);
+	void StartGuns(const std::array<int, NUM_GUNS>& numdevice);
 
-	// Start reading device_path for the given gun slot on a background thread.
-	// exclusive grabs it with EVIOCGRAB (in-game); false reads it shared (GUI binding).
-	// Restarts the slot if the device changed; an empty path stops the slot.
-	// Returns false if open failed.
-	bool Start(u32 gun, const std::string& device_path, bool exclusive = true);
+	// Start reading device_path for the given gun slot on a background thread,
+	// grabbing it exclusively (EVIOCGRAB). Restarts the slot if the device
+	// changed; an empty path stops the slot. Returns false if open failed.
+	bool Start(u32 gun, const std::string& device_path);
 
 	// Stop a single gun slot's reader, or all of them.
 	void Stop(u32 gun);
