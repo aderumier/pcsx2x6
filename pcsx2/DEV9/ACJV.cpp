@@ -597,6 +597,12 @@ static float m_jvsLightgunDX[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normal
 static float m_jvsLightgunDY[JVS_GUN_COUNT] = {-1.0f, -1.0f};  // per-gun normalized display Y (-1 = off-screen)
 static u16 m_jvsWheelChannels[JVS_WHEEL_CHANNEL_MAX] = {};
 static u16 m_jvsDrumChannels[JVS_DRUM_CHANNEL_MAX] = {};
+static bool m_jvsDrumPressed[JVS_DRUM_CHANNEL_MAX] = {};
+static u8 m_jvsDrumPulseReads[JVS_DRUM_CHANNEL_MAX] = {};
+// Hold each drum hit for exactly this many JVS analog reads. One read is enough to
+// guarantee the game sees the hit; holding longer reads as a long sensor pulse that
+// Taiko debounces, which feels like input latency.
+static constexpr u8 JVS_DRUM_PULSE_READS = 1;
 
 static float m_wheelSteerR = 0.0f; // stick right  -> steering positive
 static float m_wheelSteerL = 0.0f; // stick left   -> steering negative
@@ -795,8 +801,20 @@ void ACJV::SetWheelAxis(u32 axis, float value)
 
 void ACJV::SetDrumHit(u32 channel, bool pressed)
 {
-	if (channel < JVS_DRUM_CHANNEL_MAX)
-		m_jvsDrumChannels[channel] = pressed ? 0xFFFF : 0; // max -> above IN/DAI; big notes (大) emerge from hitting both sides
+	if (channel >= JVS_DRUM_CHANNEL_MAX)
+		return;
+
+	// Taiko drum inputs are hits, not level-sensitive buttons. Input backends can
+	// deliver fast press/release pairs between two JVS polls, especially during rolls
+	// or simultaneous left/right hits. Latch each rising edge until the next analog
+	// read consumes it (see READ_INP_ANALOG) so the game cannot miss it. Each channel
+	// stays independent so left/right Don or Ka can be hit together (big notes, 大).
+	if (pressed && !m_jvsDrumPressed[channel])
+	{
+		m_jvsDrumChannels[channel] = 0xFFFF; // max -> above IN/DAI threshold
+		m_jvsDrumPulseReads[channel] = JVS_DRUM_PULSE_READS;
+	}
+	m_jvsDrumPressed[channel] = pressed;
 }
 
 JVS_MODE ACJV::GetMode()
@@ -877,6 +895,8 @@ void ACJV::SetGameId(const std::string& gameid)
 	}
 	std::memset(m_jvsWheelChannels, 0, sizeof(m_jvsWheelChannels));
 	std::memset(m_jvsDrumChannels, 0, sizeof(m_jvsDrumChannels));
+	std::memset(m_jvsDrumPressed, 0, sizeof(m_jvsDrumPressed));
+	std::memset(m_jvsDrumPulseReads, 0, sizeof(m_jvsDrumPulseReads));
 	for (u32 p = 0; p < JVS_PLAYER_COUNT; p++) // clear macro state; InputManager repushes masks on the input reload
 	{
 		m_jvsMacroButtonState[p] = 0;
@@ -1241,10 +1261,23 @@ void do_jvs_packet(const u8* input, u8* output) {
 			else if(m_jvsMode == JVS_MODE::DRUM)
 			{
 				JVS_ASSERT(channel == JVS_DRUM_CHANNEL_MAX);
+
+				// Taiko polls drum hits through JVS analog reads. Poll host input here,
+				// immediately before returning the analog channels, instead of waiting
+				// for the next EE vsync input poll. This removes up to one frame of
+				// avoidable latency without changing System 256 timing accuracy.
+				InputManager::PollSources();
+
 				for(int i = 0; i < JVS_DRUM_CHANNEL_MAX; i++)
 				{
 					(*output++) = static_cast<u8>(m_jvsDrumChannels[i] >> 8);
 					(*output++) = static_cast<u8>(m_jvsDrumChannels[i]);
+					if (m_jvsDrumPulseReads[i] > 0)
+					{
+						m_jvsDrumPulseReads[i]--;
+						if (m_jvsDrumPulseReads[i] == 0)
+							m_jvsDrumChannels[i] = 0;
+					}
 				}
 			}
 			else if(m_jvsMode == JVS_MODE::DRIVE)
