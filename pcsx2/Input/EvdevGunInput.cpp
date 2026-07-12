@@ -11,7 +11,10 @@
 
 #include "common/Console.h"
 
+#include "fmt/format.h"
+
 #include <algorithm>
+#include <iterator>
 #include <atomic>
 #include <cerrno>
 #include <cstdlib>
@@ -309,6 +312,80 @@ namespace EvdevGun
 		return devices;
 	}
 
+	std::vector<std::pair<u16, u16>> EnumerateGunIds()
+	{
+		std::vector<std::pair<u16, u16>> ids;
+
+		udev* const ctx = udev_new();
+		if (!ctx)
+			return ids;
+
+		udev_enumerate* const en = udev_enumerate_new(ctx);
+		if (!en)
+		{
+			udev_unref(ctx);
+			return ids;
+		}
+		udev_enumerate_add_match_subsystem(en, "input");
+		udev_enumerate_add_match_property(en, "ID_INPUT_GUN", "1");
+		udev_enumerate_scan_devices(en);
+
+		udev_list_entry* dev_entry;
+		udev_list_entry_foreach(dev_entry, udev_enumerate_get_list_entry(en))
+		{
+			udev_device* const dev = udev_device_new_from_syspath(ctx, udev_list_entry_get_name(dev_entry));
+			if (!dev)
+				continue;
+
+			// id/vendor and id/product live on the input class device; event nodes carry them
+			// on their parent. Both are 4-digit hex, matching the IDs SDL reports.
+			const auto sysattr = [&](const char* attr) -> const char* {
+				const char* value = udev_device_get_sysattr_value(dev, attr);
+				if (!value)
+				{
+					if (udev_device* parent = udev_device_get_parent(dev))
+						value = udev_device_get_sysattr_value(parent, attr);
+				}
+				return value;
+			};
+
+			const char* const vendor = sysattr("id/vendor");
+			const char* const product = sysattr("id/product");
+			if (vendor && product)
+			{
+				const auto vid = static_cast<u16>(std::strtoul(vendor, nullptr, 16));
+				const auto pid = static_cast<u16>(std::strtoul(product, nullptr, 16));
+				// Virtual devices (e.g. uinput-created pointers) report 0000:0000; there is
+				// nothing for SDL to match on, so leave them out.
+				if ((vid || pid) && std::find(ids.begin(), ids.end(), std::make_pair(vid, pid)) == ids.end())
+					ids.emplace_back(vid, pid);
+			}
+
+			udev_device_unref(dev);
+		}
+
+		udev_enumerate_unref(en);
+		udev_unref(ctx);
+		return ids;
+	}
+
+	bool IsGunDevice(u16 vendor_id, u16 product_id)
+	{
+		if (!vendor_id && !product_id)
+			return false;
+
+		const std::vector<std::pair<u16, u16>> ids = EnumerateGunIds();
+		return std::find(ids.begin(), ids.end(), std::make_pair(vendor_id, product_id)) != ids.end();
+	}
+
+	std::string GetSDLBlacklistString()
+	{
+		std::string str;
+		for (const auto& [vid, pid] : EnumerateGunIds())
+			fmt::format_to(std::back_inserter(str), "{}0x{:04x}/0x{:04x}", str.empty() ? "" : ",", vid, pid);
+		return str;
+	}
+
 	void StartGuns(const std::array<int, NUM_GUNS>& numdevice)
 	{
 		const std::vector<std::pair<std::string, std::string>> devices = EnumerateDevices();
@@ -383,6 +460,9 @@ namespace EvdevGun
 namespace EvdevGun
 {
 	std::vector<std::pair<std::string, std::string>> EnumerateDevices() { return {}; }
+	std::vector<std::pair<u16, u16>> EnumerateGunIds() { return {}; }
+	bool IsGunDevice(u16, u16) { return false; }
+	std::string GetSDLBlacklistString() { return {}; }
 	u32 PointerIndexForGun(u32) { return 0; }
 	void StartGuns(const std::array<int, NUM_GUNS>&) {}
 	bool Start(u32, const std::string&) { return false; }

@@ -32,6 +32,17 @@ namespace EvdevGun
 	// Devices tagged ID_INPUT_GUN by udev, as {evdev node path, display name}.
 	std::vector<std::pair<std::string, std::string>> EnumerateDevices();
 
+	// {vendor, product} IDs of every device tagged ID_INPUT_GUN by udev.
+	std::vector<std::pair<u16, u16>> EnumerateGunIds();
+
+	// Whether this USB/HID vendor/product pair belongs to a light gun. Guns are read
+	// through evdev here, so they must be kept out of the SDL gamepad enumeration.
+	bool IsGunDevice(u16 vendor_id, u16 product_id);
+
+	// The gun IDs formatted for SDL_HINT_JOYSTICK_BLACKLIST_DEVICES, i.e.
+	// "0x1234/0x5678,0x9abc/0xdef0". Empty when no gun is connected.
+	std::string GetSDLBlacklistString();
+
 	// Pointer index a gun should read from: its dedicated evdev pointer when one is
 	// running, otherwise 0 (the system mouse). gun: 0 = P1, 1 = P2.
 	u32 PointerIndexForGun(u32 gun);

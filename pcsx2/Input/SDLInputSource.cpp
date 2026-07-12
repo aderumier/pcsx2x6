@@ -3,6 +3,7 @@
 
 #include "Config.h"
 #include "Input/SDLInputSource.h"
+#include "Input/EvdevGunInput.h"
 #include "Input/InputManager.h"
 #include "Host.h"
 
@@ -650,6 +651,16 @@ void SDLInputSource::SetHints()
 	SDL_SetHint(SDL_HINT_JOYSTICK_MFI, m_enable_mfi_driver ? "1" : "0");
 #endif
 
+#if defined(__linux__)
+	// Light guns are driven by our own evdev reader, and many of them also expose a
+	// joystick interface. Keep SDL away from them entirely: otherwise the gun claims a
+	// controller slot ahead of the real pad, and non-gun games end up bound to it.
+	const std::string gun_blacklist = EvdevGun::GetSDLBlacklistString();
+	if (!gun_blacklist.empty())
+		Console.WriteLnFmt("SDLInputSource: Ignoring light gun devices: {}", gun_blacklist);
+	SDL_SetHint(SDL_HINT_JOYSTICK_BLACKLIST_DEVICES, gun_blacklist.c_str());
+#endif
+
 	for (const std::pair<std::string, std::string>& hint : m_sdl_hints)
 		SDL_SetHint(hint.first.c_str(), hint.second.c_str());
 }
@@ -1272,6 +1283,18 @@ int SDLInputSource::GetFreePlayerId() const
 
 bool SDLInputSource::OpenDevice(SDL_JoystickID index, bool is_gamepad)
 {
+#if defined(__linux__)
+	// The blacklist hint set in SetHints() only covers guns that were already connected
+	// then, so re-check here to also catch a gun hot-plugged while we are running.
+	if (EvdevGun::IsGunDevice(SDL_GetJoystickVendorForID(index), SDL_GetJoystickProductForID(index)))
+	{
+		const char* gun_name = SDL_GetJoystickNameForID(index);
+		Console.WriteLnFmt("SDLInputSource: Not opening {} ({}), it is a light gun and is read via evdev.",
+			index, gun_name ? gun_name : "Unknown Device");
+		return false;
+	}
+#endif
+
 	SDL_Gamepad* gamepad;
 	SDL_Joystick* joystick;
 
